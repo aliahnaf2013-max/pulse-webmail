@@ -4,6 +4,7 @@ import type { IJMAPClient } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
 import { debug } from "@/lib/debug";
 import { normalizeCalendarEventLike } from "@/lib/calendar-event-normalization";
+import { buildImipInvitationBody, buildImipRequestIcs } from "@/lib/calendar-ics-export";
 
 export class RateLimitError extends Error {
   retryAfterMs: number;
@@ -2590,73 +2591,7 @@ export class JMAPClient implements IJMAPClient {
     const attendees = Object.values(event.participants).filter(p => !p.roles?.owner);
     if (attendees.length === 0) return;
 
-    const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-
-    const formatIcalDate = (dateStr: string, tz?: string | null): string => {
-      if (dateStr.endsWith('Z')) {
-        return dateStr.replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-      }
-      const basic = dateStr.replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-      if (tz) return `TZID=${tz}:${basic}`;
-      return basic;
-    };
-
-    const lines: string[] = [
-      'BEGIN:VCALENDAR',
-      'PRODID:-//JMAP-Webmail//EN',
-      'VERSION:2.0',
-      'CALSCALE:GREGORIAN',
-      'METHOD:REQUEST',
-      'BEGIN:VEVENT',
-      `UID:${event.uid}`,
-      `DTSTAMP:${now}`,
-    ];
-
-    if (event.start) {
-      if (event.showWithoutTime) {
-        const dateOnly = event.start.replace(/[-]/g, '').substring(0, 8);
-        lines.push(`DTSTART;VALUE=DATE:${dateOnly}`);
-      } else {
-        const formatted = formatIcalDate(event.start, event.timeZone);
-        lines.push(formatted.startsWith('TZID=') ? `DTSTART;${formatted}` : `DTSTART:${formatted}`);
-      }
-    }
-
-    if (event.utcEnd) {
-      if (event.showWithoutTime) {
-        const dateOnly = event.utcEnd.replace(/[-]/g, '').substring(0, 8);
-        lines.push(`DTEND;VALUE=DATE:${dateOnly}`);
-      } else {
-        const formatted = formatIcalDate(event.utcEnd, event.timeZone);
-        lines.push(formatted.startsWith('TZID=') ? `DTEND;${formatted}` : `DTEND:${formatted}`);
-      }
-    } else if (event.duration) {
-      // Fallback: emit DURATION when utcEnd is absent (RFC 5545 §3.6.1)
-      lines.push(`DURATION:${event.duration}`);
-    }
-
-    if (event.title) lines.push(`SUMMARY:${event.title}`);
-    if (event.description) lines.push(`DESCRIPTION:${event.description}`);
-    if (event.sequence != null) lines.push(`SEQUENCE:${event.sequence}`);
-    if (event.status) lines.push(`STATUS:${event.status.toUpperCase()}`);
-
-    const orgCn = organizerName ? `;CN=${organizerName}` : '';
-    lines.push(`ORGANIZER${orgCn}:mailto:${organizerEmail}`);
-
-    for (const attendee of attendees) {
-      const email = attendee.email || attendee.sendTo?.imip?.replace('mailto:', '');
-      if (!email) continue;
-      const cn = attendee.name ? `;CN=${attendee.name}` : '';
-      const partstat = attendee.participationStatus
-        ? `;PARTSTAT=${attendee.participationStatus.toUpperCase()}`
-        : ';PARTSTAT=NEEDS-ACTION';
-      const rsvp = attendee.expectReply ? ';RSVP=TRUE' : '';
-      lines.push(`ATTENDEE${cn}${partstat}${rsvp}:mailto:${email}`);
-    }
-
-    lines.push('END:VEVENT');
-    lines.push('END:VCALENDAR');
-    const icsContent = lines.map(foldIcsLine).join('\r\n') + '\r\n';
+    const icsContent = buildImipRequestIcs(event);
 
     const subject = `Invitation: ${event.title || 'Event'}`;
     const toAddresses = attendees
@@ -2681,7 +2616,7 @@ export class JMAPClient implements IJMAPClient {
         ],
       },
       bodyValues: {
-        text: { value: `You have been invited to: ${event.title || 'Event'}` },
+        text: { value: buildImipInvitationBody(event) },
         cal: { value: icsContent },
       },
     };

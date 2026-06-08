@@ -93,14 +93,22 @@ function pushAlerts(lines: string[], event: CalendarEvent): void {
   }
 }
 
-export function eventToICS(event: CalendarEvent): string {
-  const now = formatNow();
+/** Physical location name, or first virtual meeting URI for iMIP fallback. */
+export function resolveEventLocation(event: CalendarEvent): string | null {
+  if (event.locations) {
+    const first = Object.values(event.locations)[0];
+    if (first?.name) return first.name;
+  }
+  if (event.virtualLocations) {
+    for (const loc of Object.values(event.virtualLocations)) {
+      if (loc.uri) return loc.uri;
+    }
+  }
+  return null;
+}
+
+function buildVeventLines(event: CalendarEvent, now: string): string[] {
   const lines: string[] = [
-    "BEGIN:VCALENDAR",
-    "PRODID:-//JMAP-Webmail//EN",
-    "VERSION:2.0",
-    "CALSCALE:GREGORIAN",
-    "METHOD:PUBLISH",
     "BEGIN:VEVENT",
     `UID:${event.uid}`,
     `DTSTAMP:${now}`,
@@ -127,10 +135,8 @@ export function eventToICS(event: CalendarEvent): string {
     lines.push(`TRANSP:${event.freeBusyStatus === "free" ? "TRANSPARENT" : "OPAQUE"}`);
   }
 
-  if (event.locations) {
-    const first = Object.values(event.locations)[0];
-    if (first?.name) lines.push(`LOCATION:${escapeText(first.name)}`);
-  }
+  const location = resolveEventLocation(event);
+  if (location) lines.push(`LOCATION:${escapeText(location)}`);
   if (event.virtualLocations) {
     for (const loc of Object.values(event.virtualLocations)) {
       if (loc.uri) lines.push(`URL:${loc.uri}`);
@@ -163,9 +169,49 @@ export function eventToICS(event: CalendarEvent): string {
   pushAlerts(lines, event);
 
   lines.push("END:VEVENT");
-  lines.push("END:VCALENDAR");
+  return lines;
+}
 
+export function eventToICS(event: CalendarEvent): string {
+  const now = formatNow();
+  const lines: string[] = [
+    "BEGIN:VCALENDAR",
+    "PRODID:-//JMAP-Webmail//EN",
+    "VERSION:2.0",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    ...buildVeventLines(event, now),
+    "END:VCALENDAR",
+  ];
   return lines.map(foldLine).join("\r\n") + "\r\n";
+}
+
+/** RFC 6047 REQUEST attachment for client-side iMIP fallback only. */
+export function buildImipRequestIcs(event: CalendarEvent): string {
+  const now = formatNow();
+  const lines: string[] = [
+    "BEGIN:VCALENDAR",
+    "PRODID:-//JMAP-Webmail//EN",
+    "VERSION:2.0",
+    "CALSCALE:GREGORIAN",
+    "METHOD:REQUEST",
+    ...buildVeventLines(event, now),
+    "END:VCALENDAR",
+  ];
+  return lines.map(foldLine).join("\r\n") + "\r\n";
+}
+
+/** Plain-text invitation body for client-side iMIP fallback. */
+export function buildImipInvitationBody(event: CalendarEvent): string {
+  const parts: string[] = [];
+  parts.push(`You have been invited to: ${event.title || "Event"}`);
+  if (event.description) parts.push("", event.description);
+  const location = resolveEventLocation(event);
+  if (location) parts.push("", `Location: ${location}`);
+  if (event.start) {
+    parts.push("", `When: ${event.start}${event.duration ? ` (${event.duration})` : ""}`);
+  }
+  return parts.join("\n");
 }
 
 function sanitizeFilename(name: string): string {

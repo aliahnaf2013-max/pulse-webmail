@@ -12,6 +12,7 @@ import { generateUUID } from '@/lib/utils';
 import { apiFetch } from '@/lib/browser-navigation';
 import { BIRTHDAY_CALENDAR_ID } from '@/lib/birthday-calendar';
 import { getClientByLocalAccountId } from './client-registry';
+import { shouldUseClientImip } from '@/lib/jmap/scheduling-capability';
 
 /**
  * When the Pro shell aggregates calendars/events from every connected
@@ -471,7 +472,7 @@ export const useCalendarStore = create<CalendarStore>()(
           }
 
           set((state) => ({ events: [...state.events, mappedCreated] }));
-          if (sendSchedulingMessages && created.participants) {
+          if (sendSchedulingMessages && created.participants && shouldUseClientImip(client)) {
             try {
               await client.sendImipInvitation(created);
             } catch (e) {
@@ -541,7 +542,7 @@ export const useCalendarStore = create<CalendarStore>()(
               return merged;
             }),
           }));
-          if (sendSchedulingMessages) {
+          if (sendSchedulingMessages && shouldUseClientImip(client)) {
             const mergedParticipants = cleanUpdates.participants ?? storeEvent?.participants;
             if (mergedParticipants) {
               const eventForInvitation = {
@@ -787,7 +788,7 @@ export const useCalendarStore = create<CalendarStore>()(
           const realId = storeEvent?.originalId || stripLocalAccountPrefix(id, storeEvent?.localAccountId);
           const targetAccountId = storeEvent?.accountId;
           client = resolveAccountClient(client, storeEvent?.localAccountId);
-          if (sendSchedulingMessages) {
+          if (sendSchedulingMessages && shouldUseClientImip(client)) {
             try {
               const event = await client.getCalendarEvent(realId, targetAccountId);
               if (event?.participants) {
