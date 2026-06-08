@@ -2,6 +2,16 @@ import type { IJMAPClient } from './client-interface';
 
 const CALENDARS_CAPABILITY = 'urn:ietf:params:jmap:calendars';
 
+/**
+ * When "1", trust Stalwart CalendarEvent/set + sendSchedulingMessages for iMIP.
+ * Must be baked at build time (NEXT_PUBLIC_*). Until server iMIP is verified on
+ * Pulse fleet, leave unset so Bulwark client sendImipInvitation runs.
+ */
+function isPulseServerImipEnabled(): boolean {
+  if (typeof process === 'undefined') return false;
+  return process.env.NEXT_PUBLIC_PULSE_SERVER_IMIP === '1';
+}
+
 export interface JMAPSessionLike {
   capabilities?: Record<string, unknown>;
 }
@@ -23,6 +33,7 @@ export function serverHandlesCalendarScheduling(
   capabilities?: Record<string, unknown> | null,
 ): boolean {
   if (isClientImipForced()) return false;
+  if (!isPulseServerImipEnabled()) return false;
   return Boolean(capabilities?.[CALENDARS_CAPABILITY]);
 }
 

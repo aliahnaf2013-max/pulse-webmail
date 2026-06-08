@@ -140,7 +140,16 @@ describe('calendar-store iMIP gating', () => {
     vi.unstubAllEnvs();
   });
 
-  it('createEvent skips client sendImipInvitation when server handles scheduling', async () => {
+  it('createEvent calls sendImipInvitation by default (Pulse server iMIP off)', async () => {
+    const client = makeMockClient();
+    await useCalendarStore.getState().createEvent(client, makeEvent(), true);
+
+    expect(client.createCalendarEvent).toHaveBeenCalled();
+    expect(client.sendImipInvitation).toHaveBeenCalledTimes(1);
+  });
+
+  it('createEvent skips client sendImipInvitation when NEXT_PUBLIC_PULSE_SERVER_IMIP=1', async () => {
+    vi.stubEnv('NEXT_PUBLIC_PULSE_SERVER_IMIP', '1');
     const client = makeMockClient();
     await useCalendarStore.getState().createEvent(client, makeEvent(), true);
 
@@ -157,7 +166,7 @@ describe('calendar-store iMIP gating', () => {
     expect(client.sendImipInvitation).toHaveBeenCalledTimes(1);
   });
 
-  it('updateEvent skips client sendImipInvitation when server handles scheduling', async () => {
+  it('updateEvent calls sendImipInvitation by default (Pulse server iMIP off)', async () => {
     const existing = makeEvent({ id: 'evt-1' });
     useCalendarStore.setState({ events: [existing] });
     const client = makeMockClient();
@@ -170,10 +179,10 @@ describe('calendar-store iMIP gating', () => {
     );
 
     expect(client.updateCalendarEvent).toHaveBeenCalled();
-    expect(client.sendImipInvitation).not.toHaveBeenCalled();
+    expect(client.sendImipInvitation).toHaveBeenCalledTimes(1);
   });
 
-  it('deleteEvent skips client sendImipCancellation when server handles scheduling', async () => {
+  it('deleteEvent calls sendImipCancellation by default (Pulse server iMIP off)', async () => {
     const existing = makeEvent({ id: 'evt-1' });
     useCalendarStore.setState({ events: [existing] });
     const client = makeMockClient();
@@ -181,7 +190,7 @@ describe('calendar-store iMIP gating', () => {
     await useCalendarStore.getState().deleteEvent(client, 'evt-1', true);
 
     expect(client.deleteCalendarEvent).toHaveBeenCalled();
-    expect(client.getCalendarEvent).not.toHaveBeenCalled();
-    expect(client.sendImipCancellation).not.toHaveBeenCalled();
+    expect(client.getCalendarEvent).toHaveBeenCalled();
+    expect(client.sendImipCancellation).toHaveBeenCalledTimes(1);
   });
 });
