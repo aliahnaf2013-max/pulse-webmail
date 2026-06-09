@@ -6,13 +6,54 @@ import {
   resolveVirtualMeetingUri,
 } from "@/lib/calendar-ics-export";
 
-/** Hosted logo — matches Stalwart imip.rs fallback (no CID embedding in client path). */
-export const PULSE_IMIP_LOGO_URL =
-  process.env.NEXT_PUBLIC_PULSE_IMIP_LOGO_URL ??
-  "https://webmail.pulsebusiness.ai/branding/Pulse_Favicon.svg";
+/**
+ * Pulse-branded HTML for client-side iMIP REQUEST.
+ *
+ * Mirrors the transactional mail chrome in `ops/mail-templates/shell.html.j2`
+ * (brand tokens from `ops/mail-templates/brand.yaml`) so calendar invites look
+ * identical to password-reset / mail-setup emails: navy logo header, single
+ * bordered card, Bricolage headline, light-blue detail callout, blue CTA, and
+ * the `.pulse-force-light` dark-mode survival classes that stop Bulwark webmail
+ * from filter-inverting the body.
+ */
+
+// Brand tokens — kept in sync with ops/mail-templates/brand.yaml.
+const BRAND = {
+  publicSiteUrl: "https://pulsebusiness.ai",
+  // Same asset the transactional shell uses, for pixel parity with those emails.
+  logoUrl: process.env.NEXT_PUBLIC_PULSE_IMIP_LOGO_URL ?? "https://pulsebusiness.ai/pulse-favicon.svg",
+  logoText: "Pulse Business AI",
+  logoWidth: 36,
+  colors: {
+    navy: "#0B1426",
+    blue: "#3574D4",
+    background: "#f8fafc",
+    card: "#ffffff",
+    text: "#172033",
+    muted: "#46566f",
+    footer: "#6b7890",
+    border: "#dbe4f0",
+    callout: "#eef4fb",
+  },
+  fonts: {
+    heading:
+      "Bricolage Grotesque, Outfit, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif",
+    body: "Outfit, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif",
+  },
+  footerLinks: [
+    { label: "pulsebusiness.ai", url: "https://pulsebusiness.ai" },
+    { label: "Sign in", url: "https://auth.pulsebusiness.ai" },
+    { label: "Webmail", url: "https://webmail.pulsebusiness.ai" },
+    { label: "Business OS", url: "https://businessos.pulsebusiness.ai" },
+  ],
+} as const;
+
+/** Back-compat export used elsewhere; now the brand logo for shell parity. */
+export const PULSE_IMIP_LOGO_URL = BRAND.logoUrl;
 
 export interface ImipHtmlOptions {
-  header?: string;
+  /** Card headline. Defaults to "You're invited". */
+  headline?: string;
   logoUrl?: string;
 }
 
@@ -22,6 +63,26 @@ function escapeHtml(value: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+/** Force-light CSS ported from shell_styles.inc.css (classes this template uses). */
+function shellStyles(): string {
+  const c = BRAND.colors;
+  const rules = `
+      .pulse-force-light,
+      .pulse-force-light .pulse-body-cell,
+      .pulse-force-light .pulse-footer-cell { background-color: ${c.card} !important; }
+      .pulse-force-light .pulse-outer-cell { background-color: ${c.background} !important; }
+      .pulse-force-light .pulse-header-cell { background-color: ${c.navy} !important; }
+      .pulse-force-light h1,
+      .pulse-force-light .pulse-body-text { color: ${c.text} !important; }
+      .pulse-force-light .pulse-muted-text { color: ${c.muted} !important; }
+      .pulse-force-light .pulse-footer-text { color: ${c.footer} !important; }
+      .pulse-force-light .pulse-cta-link { background-color: ${c.blue} !important; color: #ffffff !important; }
+      .pulse-force-light .pulse-callout-cell { background-color: ${c.callout} !important; border-color: ${c.border} !important; }`;
+  return `${rules}
+      @media (prefers-color-scheme: dark) {${rules}
+      }`;
 }
 
 function formatWhenLabel(event: CalendarEvent): string | null {
@@ -63,112 +124,141 @@ function getOrganizerLabel(event: CalendarEvent): string | null {
   return null;
 }
 
-function detailRow(label: string, value: string, htmlValue?: string): string {
-  const safeLabel = escapeHtml(label);
+/** One labelled line inside the detail callout (uppercase muted label + value). */
+function calloutRow(label: string, value: string, htmlValue?: string): string {
   const safeValue = htmlValue ?? escapeHtml(value);
   return `
-    <tr>
-      <td align="left" style="font-size:0px;padding:10px 25px;word-break:break-word;">
-        <div style="font-family:Outfit,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:14px;line-height:1.5;text-align:left;color:#172033;">
-          <div style="font-weight:bold;color:#46566f;margin-bottom:4px;">${safeLabel}</div>
-          <div>${safeValue}</div>
-        </div>
-      </td>
-    </tr>`;
+                <tr>
+                  <td style="padding:4px 0;">
+                    <div class="pulse-muted-text" style="font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${BRAND.colors.muted};">${escapeHtml(label)}</div>
+                    <div class="pulse-body-text" style="font-size:15px;color:${BRAND.colors.text};margin-top:2px;word-break:break-word;">${safeValue}</div>
+                  </td>
+                </tr>`;
 }
 
-/** Pulse-branded HTML body for client-side iMIP REQUEST (mirrors Stalwart calendar-invite.pulse.html). */
+/** Navy header: logo image + wordmark, mirroring shell.html.j2 _logo_block. */
+function logoBlock(logoUrl: string): string {
+  const navy = BRAND.colors.navy;
+  const w = BRAND.logoWidth;
+  return `<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
+                <td bgcolor="${navy}" style="vertical-align:middle;background-color:${navy};"><img src="${escapeHtml(logoUrl)}" width="${w}" height="${w}" alt="Pulse" style="display:block;max-width:${w}px;width:${w}px;height:auto;border:0;background-color:${navy};" /></td>
+                <td bgcolor="${navy}" style="vertical-align:middle;padding-left:12px;font-size:18px;font-weight:700;color:#ffffff;background-color:${navy};">${escapeHtml(BRAND.logoText)}</td>
+              </tr></table>`;
+}
+
+function footerLinksHtml(): string {
+  return BRAND.footerLinks
+    .map(
+      (l) =>
+        `<a href="${l.url}" style="color:${BRAND.colors.blue};text-decoration:none;">${escapeHtml(l.label)}</a>`,
+    )
+    .join('<span style="color:' + BRAND.colors.footer + ';"> &middot; </span>');
+}
+
+/** Pulse-branded HTML body for client-side iMIP REQUEST. */
 export function buildImipInvitationHtml(
   event: CalendarEvent,
   options: ImipHtmlOptions = {},
 ): string {
-  const logoUrl = options.logoUrl ?? PULSE_IMIP_LOGO_URL;
-  const header = options.header ?? `Invitation: ${event.title || "Event"}`;
+  const c = BRAND.colors;
+  const logoUrl = options.logoUrl ?? BRAND.logoUrl;
+  const headline = options.headline ?? "You're invited";
+  const title = event.title || "Event";
   const when = formatWhenLabel(event);
   const physical = resolvePhysicalLocationName(event);
   const joinUri = resolveVirtualMeetingUri(event);
   const organizer = getOrganizerLabel(event);
+  const preheader = `${title}${when ? ` — ${when}` : ""}`;
+  const greeting = organizer
+    ? `${escapeHtml(organizer)} invited you to the following event.`
+    : "You have been invited to the following event.";
 
-  const rows: string[] = [];
-  rows.push(detailRow("Event", event.title || "Event"));
-  if (organizer) rows.push(detailRow("Organizer", organizer));
-  if (when) rows.push(detailRow("When", when));
-  if (physical) rows.push(detailRow("Location", physical));
+  const rows: string[] = [calloutRow("Event", title)];
+  if (when) rows.push(calloutRow("When", when));
+  if (physical) rows.push(calloutRow("Location", physical));
   if (joinUri) {
     rows.push(
-      detailRow(
+      calloutRow(
         "Join online",
         joinUri,
-        `<a href="${escapeHtml(joinUri)}" style="color:#3574D4;font-weight:600;text-decoration:none;" target="_blank" rel="noopener noreferrer">${escapeHtml(joinUri)}</a>`,
+        `<a href="${escapeHtml(joinUri)}" style="color:${c.blue};font-weight:600;text-decoration:none;" target="_blank" rel="noopener noreferrer">${escapeHtml(joinUri)}</a>`,
       ),
     );
   }
   if (event.description?.trim()) {
-    rows.push(detailRow("Description", event.description.trim()));
+    rows.push(calloutRow("Description", event.description.trim()));
   }
 
-  const joinButton = joinUri
-    ? `<tr>
-        <td align="center" style="font-size:0px;padding:16px 25px 24px;word-break:break-word;">
-          <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:separate;line-height:100%;">
-            <tr>
-              <td align="center" bgcolor="#3574D4" role="presentation" style="border:none;border-radius:8px;cursor:auto;">
-                <a href="${escapeHtml(joinUri)}" style="display:inline-block;background:#3574D4;color:#ffffff;font-family:Outfit,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:14px;font-weight:bold;line-height:120%;margin:0;text-decoration:none;padding:12px 24px;border-radius:8px;" target="_blank" rel="noopener noreferrer">Join meeting</a>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>`
+  const ctaButton = joinUri
+    ? `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 8px;">
+                <tr>
+                  <td bgcolor="${c.blue}" style="border-radius:8px;background-color:${c.blue};">
+                    <a class="pulse-email-cta pulse-cta-link" href="${escapeHtml(joinUri)}" style="display:inline-block;background-color:${c.blue};color:#ffffff;text-decoration:none;font-weight:700;padding:14px 24px;border-radius:8px;min-height:44px;line-height:18px;mso-padding-alt:14px 24px;" target="_blank" rel="noopener noreferrer">Join meeting</a>
+                  </td>
+                </tr>
+              </table>`
     : "";
 
   return `<!doctype html>
-<html lang="en">
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light">
-  <title>${escapeHtml(header)}</title>
-</head>
-<body style="margin:0;padding:0;background-color:#f8fafc;word-spacing:normal;">
-  <div style="background-color:#f8fafc;padding:24px 12px;">
-    <div class="color-info" style="margin:0 auto;max-width:600px;background:#3574D4;background-color:#3574D4;border-radius:12px 12px 0 0;">
-      <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
-        <tr>
-          <td align="center" style="padding:14px 25px;font-family:Outfit,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:16px;font-weight:bold;line-height:1.4;color:#ffffff;">
-            ${escapeHtml(header)}
-          </td>
-        </tr>
-      </table>
-    </div>
-    <div style="background:#ffffff;margin:0 auto;max-width:600px;border:1px solid #dbe4f0;border-top:none;">
-      <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
-        <tr>
-          <td style="padding:0;">
-            <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
-              <tr>
-                <td align="left" style="padding:20px 25px 10px;background-color:#0B1426;">
-                  <img src="${escapeHtml(logoUrl)}" alt="Pulse" width="36" height="36" style="border:0;display:block;height:36px;width:36px;">
-                </td>
-              </tr>
-              ${rows.join("")}
-              ${joinButton}
-            </table>
-          </td>
-        </tr>
-      </table>
-    </div>
-    <div style="background:#f8fafc;margin:0 auto;max-width:600px;border:1px solid #dbe4f0;border-top:none;border-radius:0 0 12px 12px;">
-      <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
-        <tr>
-          <td align="center" style="padding:20px 25px;font-family:Outfit,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:12px;line-height:1.6;color:#6b7890;">
-            <a href="https://pulsebusiness.ai" style="color:#3574D4;text-decoration:none;margin:0 6px;">pulsebusiness.ai</a>
-            <a href="https://webmail.pulsebusiness.ai" style="color:#3574D4;text-decoration:none;margin:0 6px;">Webmail</a>
-            <a href="https://auth.pulsebusiness.ai" style="color:#3574D4;text-decoration:none;margin:0 6px;">Sign in</a>
-          </td>
-        </tr>
-      </table>
-    </div>
-  </div>
-</body>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta name="supported-color-schemes" content="light" />
+    <meta name="x-apple-disable-message-reformatting" />
+    <title>${escapeHtml(headline)}: ${escapeHtml(title)}</title>
+    <!--[if mso]>
+    <noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript>
+    <![endif]-->
+    <style>
+      :root { color-scheme: light; supported-color-schemes: light; }
+      @media (max-width:480px) {
+        .pulse-email-card { border-radius: 0 !important; }
+        .pulse-email-pad { padding-left: 20px !important; padding-right: 20px !important; }
+        .pulse-email-cta { display: block !important; width: 100% !important; box-sizing: border-box !important; text-align: center !important; }
+      }
+${shellStyles()}
+    </style>
+  </head>
+  <body class="pulse-force-light" style="margin:0;padding:0;background-color:${c.background};font-family:${BRAND.fonts.body};color:${c.text};line-height:1.5;">
+    <!-- prefers-color-scheme: dark — Bulwark webmail detects this marker and skips iframe filter-invert -->
+    <style>
+${shellStyles()}
+    </style>
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${c.background};">${escapeHtml(preheader)}</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="pulse-outer-cell" bgcolor="${c.background}" style="background-color:${c.background};margin:0;padding:28px 12px;">
+      <tr><td align="center" class="pulse-outer-cell" bgcolor="${c.background}" style="background-color:${c.background};">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="pulse-email-card pulse-force-light" bgcolor="${c.card}" style="max-width:584px;background-color:${c.card};border:1px solid ${c.border};border-radius:12px;overflow:hidden;">
+          <tr>
+            <td class="pulse-email-pad pulse-header-cell" bgcolor="${c.navy}" style="padding:24px 28px 20px;background-color:${c.navy};">
+              <a href="${BRAND.publicSiteUrl}" style="text-decoration:none;color:#ffffff;">
+                ${logoBlock(logoUrl)}
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td class="pulse-email-pad pulse-body-cell" bgcolor="${c.card}" style="padding:30px 28px 26px;background-color:${c.card};">
+              <h1 style="font-family:${BRAND.fonts.heading};font-size:26px;line-height:1.25;margin:0 0 12px;color:${c.text};font-weight:700;">${escapeHtml(headline)}</h1>
+              <p class="pulse-body-text" style="font-size:16px;margin:0 0 18px;color:${c.text};">${greeting}</p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="pulse-callout-cell" style="margin:0 0 22px;">
+                <tr><td class="pulse-callout-cell" bgcolor="${c.callout}" style="padding:14px 18px;background-color:${c.callout};border:1px solid ${c.border};border-radius:8px;">
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">${rows.join("")}
+                  </table>
+                </td></tr>
+              </table>
+              ${ctaButton}
+            </td>
+          </tr>
+          <tr>
+            <td class="pulse-email-pad pulse-footer-cell" bgcolor="${c.background}" style="padding:18px 28px;background-color:${c.background};border-top:1px solid #e6edf6;">
+              <p class="pulse-footer-text" style="font-size:13px;color:${c.footer};margin:0 0 8px;">&mdash; The ${escapeHtml(BRAND.logoText)} team</p>
+              <p class="pulse-footer-text" style="font-size:12px;color:${c.footer};margin:0;">${footerLinksHtml()}</p>
+            </td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
 </html>`;
 }

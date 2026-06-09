@@ -32,13 +32,28 @@ describe("buildImipInvitationHtml", () => {
       }),
     );
 
-    expect(html).toContain("Pulse_Favicon.svg");
+    expect(html).toContain("pulse-favicon.svg");
     expect(html).toContain("#0B1426");
     expect(html).toContain("#3574D4");
     expect(html).toContain("Join meeting");
     expect(html).toContain("https://meet.example.com/room");
     expect(html).toContain("pulsebusiness.ai");
     expect(html).toContain("Agenda items");
+  });
+
+  it("matches the transactional shell chrome (force-light, wordmark, callout, 4-link footer)", () => {
+    const html = buildImipInvitationHtml(makeEvent());
+    // Bulwark iframe invert survival + Apple Mail dark mode.
+    expect(html).toContain("pulse-force-light");
+    expect(html).toContain("prefers-color-scheme: dark");
+    // Navy header carries the wordmark, not just the logo.
+    expect(html).toContain("Pulse Business AI");
+    // Single bordered card + detail callout, matching shell.html.j2.
+    expect(html).toContain("pulse-email-card");
+    expect(html).toContain("pulse-callout-cell");
+    // Footer links mirror brand.yaml (4 links incl. Business OS).
+    expect(html).toContain("Business OS");
+    expect(html).toContain("The Pulse Business AI team");
   });
 
   it("escapes HTML in event title", () => {
