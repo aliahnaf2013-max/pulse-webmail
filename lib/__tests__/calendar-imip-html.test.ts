@@ -32,13 +32,19 @@ describe("buildImipInvitationHtml", () => {
       }),
     );
 
-    expect(html).toContain("pulse-favicon.svg");
     expect(html).toContain("#0B1426");
     expect(html).toContain("#3574D4");
     expect(html).toContain("Join meeting");
     expect(html).toContain("https://meet.example.com/room");
     expect(html).toContain("pulsebusiness.ai");
     expect(html).toContain("Agenda items");
+  });
+
+  it("uses a text-only wordmark header (no logo image — Outlook drops SVGs/remote images)", () => {
+    const html = buildImipInvitationHtml(makeEvent());
+    expect(html).toContain("Pulse Business AI");
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain(".svg");
   });
 
   it("matches the transactional shell chrome (force-light, wordmark, callout, 4-link footer)", () => {

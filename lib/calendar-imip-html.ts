@@ -20,10 +20,9 @@ import {
 // Brand tokens — kept in sync with ops/mail-templates/brand.yaml.
 const BRAND = {
   publicSiteUrl: "https://pulsebusiness.ai",
-  // Same asset the transactional shell uses, for pixel parity with those emails.
-  logoUrl: process.env.NEXT_PUBLIC_PULSE_IMIP_LOGO_URL ?? "https://pulsebusiness.ai/pulse-favicon.svg",
+  // Wordmark only — Outlook (Word renderer) drops SVGs and blocks remote images
+  // by default, so a logo <img> shows a broken box. Text always renders.
   logoText: "Pulse Business AI",
-  logoWidth: 36,
   colors: {
     navy: "#0B1426",
     blue: "#3574D4",
@@ -48,13 +47,9 @@ const BRAND = {
   ],
 } as const;
 
-/** Back-compat export used elsewhere; now the brand logo for shell parity. */
-export const PULSE_IMIP_LOGO_URL = BRAND.logoUrl;
-
 export interface ImipHtmlOptions {
   /** Card headline. Defaults to "You're invited". */
   headline?: string;
-  logoUrl?: string;
 }
 
 function escapeHtml(value: string): string {
@@ -136,14 +131,9 @@ function calloutRow(label: string, value: string, htmlValue?: string): string {
                 </tr>`;
 }
 
-/** Navy header: logo image + wordmark, mirroring shell.html.j2 _logo_block. */
-function logoBlock(logoUrl: string): string {
-  const navy = BRAND.colors.navy;
-  const w = BRAND.logoWidth;
-  return `<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
-                <td bgcolor="${navy}" style="vertical-align:middle;background-color:${navy};"><img src="${escapeHtml(logoUrl)}" width="${w}" height="${w}" alt="Pulse" style="display:block;max-width:${w}px;width:${w}px;height:auto;border:0;background-color:${navy};" /></td>
-                <td bgcolor="${navy}" style="vertical-align:middle;padding-left:12px;font-size:18px;font-weight:700;color:#ffffff;background-color:${navy};">${escapeHtml(BRAND.logoText)}</td>
-              </tr></table>`;
+/** Navy header wordmark — text only (mirrors shell.html.j2 _logo_block image-off fallback). */
+function logoBlock(): string {
+  return `<span style="font-size:20px;font-weight:700;color:#ffffff;line-height:1.2;">${escapeHtml(BRAND.logoText)}</span>`;
 }
 
 function footerLinksHtml(): string {
@@ -161,7 +151,6 @@ export function buildImipInvitationHtml(
   options: ImipHtmlOptions = {},
 ): string {
   const c = BRAND.colors;
-  const logoUrl = options.logoUrl ?? BRAND.logoUrl;
   const headline = options.headline ?? "You're invited";
   const title = event.title || "Event";
   const when = formatWhenLabel(event);
@@ -233,7 +222,7 @@ ${shellStyles()}
           <tr>
             <td class="pulse-email-pad pulse-header-cell" bgcolor="${c.navy}" style="padding:24px 28px 20px;background-color:${c.navy};">
               <a href="${BRAND.publicSiteUrl}" style="text-decoration:none;color:#ffffff;">
-                ${logoBlock(logoUrl)}
+                ${logoBlock()}
               </a>
             </td>
           </tr>
