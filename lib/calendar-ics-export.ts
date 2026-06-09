@@ -93,18 +93,34 @@ function pushAlerts(lines: string[], event: CalendarEvent): void {
   }
 }
 
-/** Physical location name, or first virtual meeting URI for iMIP fallback. */
-export function resolveEventLocation(event: CalendarEvent): string | null {
-  if (event.locations) {
-    const first = Object.values(event.locations)[0];
-    if (first?.name) return first.name;
-  }
-  if (event.virtualLocations) {
-    for (const loc of Object.values(event.virtualLocations)) {
-      if (loc.uri) return loc.uri;
-    }
+/** Ensure meeting links are absolute http(s) URLs for iMIP/ICS consumers. */
+export function normalizeMeetingUri(uri: string): string {
+  const trimmed = uri.trim();
+  if (!trimmed) return trimmed;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+export function resolvePhysicalLocationName(event: CalendarEvent): string | null {
+  if (!event.locations) return null;
+  const first = Object.values(event.locations)[0];
+  const name = first?.name?.trim();
+  return name || null;
+}
+
+/** First virtual meeting URI, normalized for mail/calendar clients. */
+export function resolveVirtualMeetingUri(event: CalendarEvent): string | null {
+  if (!event.virtualLocations) return null;
+  for (const loc of Object.values(event.virtualLocations)) {
+    const uri = loc.uri?.trim();
+    if (uri) return normalizeMeetingUri(uri);
   }
   return null;
+}
+
+/** ICS LOCATION: prefer join URL, else physical location name. */
+export function resolveEventLocation(event: CalendarEvent): string | null {
+  return resolveVirtualMeetingUri(event) ?? resolvePhysicalLocationName(event);
 }
 
 function buildVeventLines(event: CalendarEvent, now: string): string[] {
@@ -137,11 +153,8 @@ function buildVeventLines(event: CalendarEvent, now: string): string[] {
 
   const location = resolveEventLocation(event);
   if (location) lines.push(`LOCATION:${escapeText(location)}`);
-  if (event.virtualLocations) {
-    for (const loc of Object.values(event.virtualLocations)) {
-      if (loc.uri) lines.push(`URL:${loc.uri}`);
-    }
-  }
+  const joinUri = resolveVirtualMeetingUri(event);
+  if (joinUri) lines.push(`URL:${joinUri}`);
 
   if (event.participants) {
     const organizer = Object.values(event.participants).find((p) => p.roles?.owner);
@@ -206,8 +219,10 @@ export function buildImipInvitationBody(event: CalendarEvent): string {
   const parts: string[] = [];
   parts.push(`You have been invited to: ${event.title || "Event"}`);
   if (event.description) parts.push("", event.description);
-  const location = resolveEventLocation(event);
-  if (location) parts.push("", `Location: ${location}`);
+  const physicalLocation = resolvePhysicalLocationName(event);
+  const joinUri = resolveVirtualMeetingUri(event);
+  if (physicalLocation) parts.push("", `Location: ${physicalLocation}`);
+  if (joinUri) parts.push("", `Join: ${joinUri}`);
   if (event.start) {
     parts.push("", `When: ${event.start}${event.duration ? ` (${event.duration})` : ""}`);
   }

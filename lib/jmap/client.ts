@@ -5,6 +5,7 @@ import { toWildcardQuery } from "./search-utils";
 import { debug } from "@/lib/debug";
 import { normalizeCalendarEventLike } from "@/lib/calendar-event-normalization";
 import { buildImipInvitationBody, buildImipRequestIcs } from "@/lib/calendar-ics-export";
+import { buildImipInvitationHtml } from "@/lib/calendar-imip-html";
 
 export class RateLimitError extends Error {
   retryAfterMs: number;
@@ -2592,6 +2593,8 @@ export class JMAPClient implements IJMAPClient {
     if (attendees.length === 0) return;
 
     const icsContent = buildImipRequestIcs(event);
+    const plainBody = buildImipInvitationBody(event);
+    const htmlBody = buildImipInvitationHtml(event);
 
     const subject = `Invitation: ${event.title || 'Event'}`;
     const toAddresses = attendees
@@ -2608,15 +2611,22 @@ export class JMAPClient implements IJMAPClient {
       keywords: { "$seen": true, "$draft": true },
       mailboxIds: { [draftsMailbox.id]: true },
       bodyStructure: {
-        // See RFC 6047 §3: https://www.rfc-editor.org/rfc/rfc6047#section-3
+        // RFC 6047 §3: calendar part must be in multipart/mixed (not top-level alternative).
         type: 'multipart/mixed',
         subParts: [
-          { partId: 'text', type: 'text/plain' },
+          {
+            type: 'multipart/alternative',
+            subParts: [
+              { partId: 'text', type: 'text/plain' },
+              { partId: 'html', type: 'text/html' },
+            ],
+          },
           { partId: 'cal', type: 'text/calendar; method=REQUEST; charset=UTF-8', disposition: 'inline', name: 'invite.ics' },
         ],
       },
       bodyValues: {
-        text: { value: buildImipInvitationBody(event) },
+        text: { value: plainBody },
+        html: { value: htmlBody },
         cal: { value: icsContent },
       },
     };
