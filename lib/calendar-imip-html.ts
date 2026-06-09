@@ -200,16 +200,6 @@ export function buildImipInvitationHtml(
     rows.push(calloutRow("Description", event.description.trim()));
   }
 
-  const ctaButton = joinUri
-    ? `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 8px;">
-                <tr>
-                  <td bgcolor="${c.blue}" style="border-radius:8px;background-color:${c.blue};">
-                    <a class="pulse-email-cta pulse-cta-link" href="${escapeHtml(joinUri)}" style="display:inline-block;background-color:${c.blue};color:#ffffff;text-decoration:none;font-weight:700;padding:14px 24px;border-radius:8px;min-height:44px;line-height:18px;mso-padding-alt:14px 24px;" target="_blank" rel="noopener noreferrer">Join meeting</a>
-                  </td>
-                </tr>
-              </table>`
-    : "";
-
   return `<!doctype html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
   <head>
@@ -240,7 +230,7 @@ ${shellStyles()}
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${c.background};">${escapeHtml(preheader)}</div>
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="pulse-outer-cell" bgcolor="${c.background}" style="background-color:${c.background};margin:0;padding:28px 12px;">
       <tr><td align="center" class="pulse-outer-cell" bgcolor="${c.background}" style="background-color:${c.background};">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="pulse-email-card pulse-force-light" bgcolor="${c.card}" style="max-width:584px;background-color:${c.card};border:1px solid ${c.border};border-radius:12px;overflow:hidden;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="pulse-email-card pulse-force-light" bgcolor="${c.card}" style="max-width:640px;background-color:${c.card};border:1px solid ${c.border};border-radius:12px;overflow:hidden;">
           <tr>
             <td class="pulse-email-pad pulse-header-cell" bgcolor="${c.navy}" style="padding:24px 28px 20px;background-color:${c.navy};background-image:${BRAND.headerGradient};">
               <a href="${BRAND.publicSiteUrl}" style="text-decoration:none;color:#ffffff;">
@@ -252,13 +242,12 @@ ${shellStyles()}
             <td class="pulse-email-pad pulse-body-cell" bgcolor="${c.card}" style="padding:30px 28px 26px;background-color:${c.card};">
               <h1 style="font-family:${BRAND.fonts.heading};font-size:26px;line-height:1.25;margin:0 0 12px;color:${c.text};font-weight:700;">${escapeHtml(headline)}</h1>
               <p class="pulse-body-text" style="font-size:16px;margin:0 0 18px;color:${c.text};">${greeting}</p>
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="pulse-callout-cell" style="margin:0 0 22px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="pulse-callout-cell" style="margin:0;">
                 <tr><td class="pulse-callout-cell" bgcolor="${c.callout}" style="padding:14px 18px;background-color:${c.callout};border:1px solid ${c.border};border-radius:8px;">
                   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">${rows.join("")}
                   </table>
                 </td></tr>
               </table>
-              ${ctaButton}
             </td>
           </tr>
           <tr>

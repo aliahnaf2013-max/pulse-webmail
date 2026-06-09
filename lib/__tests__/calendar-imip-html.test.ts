@@ -17,7 +17,7 @@ function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
 }
 
 describe("buildImipInvitationHtml", () => {
-  it("includes Pulse branding, logo, and join button", () => {
+  it("includes Pulse branding and the join link (no redundant button)", () => {
     const html = buildImipInvitationHtml(
       makeEvent({
         virtualLocations: {
@@ -34,8 +34,9 @@ describe("buildImipInvitationHtml", () => {
 
     expect(html).toContain("#0B1426");
     expect(html).toContain("#3574D4");
-    expect(html).toContain("Join meeting");
+    // Join is the callout link only — the separate CTA button was removed as redundant.
     expect(html).toContain("https://meet.example.com/room");
+    expect(html).not.toContain("Join meeting");
     expect(html).toContain("pulsebusiness.ai");
     expect(html).toContain("Agenda items");
   });
