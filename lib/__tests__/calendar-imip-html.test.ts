@@ -40,11 +40,18 @@ describe("buildImipInvitationHtml", () => {
     expect(html).toContain("Agenda items");
   });
 
-  it("uses a text-only wordmark header (no logo image — Outlook drops SVGs/remote images)", () => {
+  it("header has the signature gradient + PNG logo with wordmark fallback", () => {
     const html = buildImipInvitationHtml(makeEvent());
-    expect(html).toContain("Pulse Business AI");
-    expect(html).not.toContain("<img");
-    expect(html).not.toContain(".svg");
+    // Amber + blue two-layer gradient (degrades to navy in Outlook).
+    expect(html).toContain("radial-gradient");
+    expect(html).toContain("background-color:#0B1426");
+    expect(html).toContain("#f59e0b");
+    // PNG logo (NOT SVG — Outlook can render PNG once images download).
+    expect(html).toContain("Pulse_Favicon.png");
+    expect(html).not.toContain("Pulse_Favicon.svg");
+    // Wordmark stays as the image-blocked fallback.
+    expect(html).toContain(">Pulse<");
+    expect(html).toContain(">Business AI<");
   });
 
   it("matches the transactional shell chrome (force-light, wordmark, callout, 4-link footer)", () => {

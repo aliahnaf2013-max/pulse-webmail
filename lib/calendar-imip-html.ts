@@ -20,12 +20,18 @@ import {
 // Brand tokens — kept in sync with ops/mail-templates/brand.yaml.
 const BRAND = {
   publicSiteUrl: "https://pulsebusiness.ai",
-  // Wordmark only — Outlook (Word renderer) drops SVGs and blocks remote images
-  // by default, so a logo <img> shows a broken box. Text always renders.
   logoText: "Pulse Business AI",
+  // PNG (not SVG) so it can render in Outlook once images are downloaded — the
+  // bind-mounted asset at /branding/Pulse_Favicon.png. The wordmark text sits
+  // beside it as a fallback (image-blocked / not-downloaded clients still read).
+  logoUrl:
+    process.env.NEXT_PUBLIC_PULSE_IMIP_LOGO_URL ??
+    "https://webmail.pulsebusiness.ai/branding/Pulse_Favicon.png",
+  logoWidth: 36,
   colors: {
     navy: "#0B1426",
     blue: "#3574D4",
+    amber: "#f59e0b",
     background: "#f8fafc",
     card: "#ffffff",
     text: "#172033",
@@ -34,6 +40,11 @@ const BRAND = {
     border: "#dbe4f0",
     callout: "#eef4fb",
   },
+  // Two-layer band from the compose signature: amber bloom anchored bottom-right
+  // + faint blue glow top-centre, over solid navy. Email clients that ignore
+  // gradients (Outlook) fall back to the navy background-color.
+  headerGradient:
+    "radial-gradient(ellipse 80% 85% at 100% 100%, rgba(217,119,6,0.72) 0%, rgba(245,158,11,0.42) 28%, rgba(245,158,11,0.14) 56%, rgba(11,20,38,0) 84%), radial-gradient(ellipse 70% 55% at 52% -10%, rgba(53,116,212,0.22) 0%, rgba(53,116,212,0) 66%)",
   fonts: {
     heading:
       "Bricolage Grotesque, Outfit, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif",
@@ -131,9 +142,20 @@ function calloutRow(label: string, value: string, htmlValue?: string): string {
                 </tr>`;
 }
 
-/** Navy header wordmark — text only (mirrors shell.html.j2 _logo_block image-off fallback). */
+/**
+ * Brand lockup mirroring the compose signature: PNG logo + "Pulse" wordmark with
+ * a small amber "Business AI" sub-label. Wordmark text is the fallback when the
+ * image is blocked/undownloaded.
+ */
 function logoBlock(): string {
-  return `<span style="font-size:20px;font-weight:700;color:#ffffff;line-height:1.2;">${escapeHtml(BRAND.logoText)}</span>`;
+  const w = BRAND.logoWidth;
+  return `<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
+                <td valign="middle" style="padding-right:10px;"><img src="${escapeHtml(BRAND.logoUrl)}" width="${w}" height="${w}" alt="Pulse" style="display:block;width:${w}px;height:${w}px;border:0;" /></td>
+                <td valign="middle">
+                  <span style="display:block;font-size:22px;font-weight:800;color:#ffffff;letter-spacing:0.02em;line-height:1.05;">Pulse</span>
+                  <span style="display:block;margin-top:1px;font-size:8px;font-weight:800;letter-spacing:0.22em;text-transform:uppercase;color:${BRAND.colors.amber};">Business AI</span>
+                </td>
+              </tr></table>`;
 }
 
 function footerLinksHtml(): string {
@@ -220,7 +242,7 @@ ${shellStyles()}
       <tr><td align="center" class="pulse-outer-cell" bgcolor="${c.background}" style="background-color:${c.background};">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="pulse-email-card pulse-force-light" bgcolor="${c.card}" style="max-width:584px;background-color:${c.card};border:1px solid ${c.border};border-radius:12px;overflow:hidden;">
           <tr>
-            <td class="pulse-email-pad pulse-header-cell" bgcolor="${c.navy}" style="padding:24px 28px 20px;background-color:${c.navy};">
+            <td class="pulse-email-pad pulse-header-cell" bgcolor="${c.navy}" style="padding:24px 28px 20px;background-color:${c.navy};background-image:${BRAND.headerGradient};">
               <a href="${BRAND.publicSiteUrl}" style="text-decoration:none;color:#ffffff;">
                 ${logoBlock()}
               </a>
