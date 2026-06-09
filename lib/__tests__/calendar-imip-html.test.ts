@@ -65,8 +65,7 @@ describe("buildImipInvitationHtml", () => {
     // Single bordered card + detail callout, matching shell.html.j2.
     expect(html).toContain("pulse-email-card");
     expect(html).toContain("pulse-callout-cell");
-    // Footer links mirror brand.yaml (4 links incl. Business OS).
-    expect(html).toContain("Business OS");
+    // Footer carries only the pulsebusiness.ai link.
     expect(html).toContain("The Pulse Business AI team");
   });
 

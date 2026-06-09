@@ -52,9 +52,6 @@ const BRAND = {
   },
   footerLinks: [
     { label: "pulsebusiness.ai", url: "https://pulsebusiness.ai" },
-    { label: "Sign in", url: "https://auth.pulsebusiness.ai" },
-    { label: "Webmail", url: "https://webmail.pulsebusiness.ai" },
-    { label: "Business OS", url: "https://businessos.pulsebusiness.ai" },
   ],
 } as const;
 
