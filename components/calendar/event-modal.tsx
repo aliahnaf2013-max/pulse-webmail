@@ -257,6 +257,8 @@ export function EventModal({
   const [virtualLocation, setVirtualLocation] = useState(
     event?.virtualLocations ? Object.values(event.virtualLocations)[0]?.uri || "" : ""
   );
+  const [defaultZoomId, setDefaultZoomId] = useState<string | null>(null);
+  const [defaultZoomUrl, setDefaultZoomUrl] = useState<string | null>(null);
   const [startDate, setStartDate] = useState(formatDateInput(getInitialStart()));
   const [startTime, setStartTime] = useState(formatTimeInput(getInitialStart()));
   const [endDate, setEndDate] = useState(formatDateInput(getInitialEnd()));
@@ -336,8 +338,52 @@ export function EventModal({
       });
       if (!cancelled) setPluginConflictWarnings(warnings);
     }, 250);
-    return () => { cancelled = true; clearTimeout(t); };
   }, [title, description, startDate, startTime, endDate, endTime, allDay, location, virtualLocation, calendarId]);
+
+  // Zoom Profile Integration: Listen for Zoom details from parent Portal window
+  useEffect(() => {
+    if (isEdit) return;
+
+    let parentOrigin = "https://app.pulsebusiness.ai";
+    if (typeof document !== "undefined") {
+      const meta = document.querySelector('meta[name="parent-origin"]');
+      if (meta) {
+        const val = meta.getAttribute("content");
+        if (val) {
+          try {
+            parentOrigin = new URL(val).origin;
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+    }
+
+    const handleMessage = (e: MessageEvent) => {
+      if (e.origin !== parentOrigin) return;
+      if (e.data?.source === "portal" && e.data?.type === "profile:zoom-info") {
+        const { zoom_meeting_id, zoom_meeting_url } = e.data;
+        if (zoom_meeting_id) {
+          setDefaultZoomId(zoom_meeting_id);
+        }
+        if (zoom_meeting_url) {
+          setDefaultZoomUrl(zoom_meeting_url);
+          setVirtualLocation(zoom_meeting_url);
+          setLocation((prev) => (prev ? prev : zoom_meeting_url));
+        }
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    window.parent.postMessage(
+      { source: "bulwark", type: "profile:get-zoom-info" },
+      parentOrigin
+    );
+
+    return () => {
+      window.removeEventListener("message", handleMessage);
+    };
+  }, [isEdit]);
 
   // Report live preview to parent for grid outline
   useEffect(() => {
@@ -973,7 +1019,18 @@ export function EventModal({
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-1 block">{t("form.location")}</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm font-medium">{t("form.location")}</label>
+              {defaultZoomId && (
+                <button
+                  type="button"
+                  onClick={() => setLocation(defaultZoomId)}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Use Default Zoom ID
+                </button>
+              )}
+            </div>
             <Input
               value={location}
               onChange={(e) => setLocation(e.target.value)}
@@ -983,12 +1040,23 @@ export function EventModal({
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-1 block">
-              <span className="flex items-center gap-1.5">
-                <Video className="w-4 h-4" />
-                {t("form.meeting_link")}
-              </span>
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm font-medium">
+                <span className="flex items-center gap-1.5">
+                  <Video className="w-4 h-4" />
+                  {t("form.meeting_link")}
+                </span>
+              </label>
+              {defaultZoomUrl && (
+                <button
+                  type="button"
+                  onClick={() => setVirtualLocation(defaultZoomUrl)}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Use Default Zoom URL
+                </button>
+              )}
+            </div>
             <Input
               type="url"
               value={virtualLocation}
