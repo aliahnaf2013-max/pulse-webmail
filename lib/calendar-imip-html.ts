@@ -145,12 +145,10 @@ function calloutRow(label: string, value: string, htmlValue?: string): string {
  * image is blocked/undownloaded.
  */
 function logoBlock(): string {
-  const w = BRAND.logoWidth;
   return `<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
-                <td valign="middle" style="padding-right:10px;"><img src="${escapeHtml(BRAND.logoUrl)}" width="${w}" height="${w}" alt="Pulse" style="display:block;width:${w}px;height:${w}px;border:0;" /></td>
                 <td valign="middle">
-                  <span style="display:block;font-size:22px;font-weight:800;color:#ffffff;letter-spacing:0.02em;line-height:1.05;">Pulse</span>
-                  <span style="display:block;margin-top:1px;font-size:8px;font-weight:800;letter-spacing:0.22em;text-transform:uppercase;color:${BRAND.colors.amber};">Business AI</span>
+                  <span style="display:block;font-size:30px;font-weight:800;color:#ffffff;letter-spacing:0.18em;line-height:1.0;text-transform:uppercase;">Pulse</span>
+                  <span style="display:block;margin-top:4px;font-size:11px;font-weight:800;letter-spacing:0.36em;text-transform:uppercase;color:${BRAND.colors.amber};line-height:1.0;">Business AI</span>
                 </td>
               </tr></table>`;
 }

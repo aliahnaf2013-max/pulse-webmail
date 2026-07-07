@@ -103,4 +103,49 @@ describe('EventModal Zoom Integration', () => {
 
     expect(screen.queryByText('Use Default Zoom ID')).not.toBeInTheDocument();
   });
+
+  it('sends zoom:create-meeting request to parent when Create Zoom Meeting is clicked and sets inputs on success', async () => {
+    const postMessageSpy = vi.spyOn(window, 'postMessage');
+    const parentPostMessageSpy = vi.spyOn(window.parent, 'postMessage');
+
+    render(<EventModal {...defaultProps} />);
+
+    // Click "Create Zoom Meeting" button
+    const createBtn = screen.getByText('Create Zoom Meeting');
+    expect(createBtn).toBeInTheDocument();
+    fireEvent.click(createBtn);
+
+    // Assert it posted request to parent
+    expect(parentPostMessageSpy).toHaveBeenCalledWith(
+      {
+        source: 'bulwark',
+        type: 'zoom:create-meeting',
+        topic: 'Scheduled Meeting',
+        startTime: expect.any(String),
+        duration: 60,
+      },
+      'https://app.pulsebusiness.ai'
+    );
+
+    // Simulate parent replying with zoom:meeting-created
+    const messageEvent = new MessageEvent('message', {
+      origin: 'https://app.pulsebusiness.ai',
+      data: {
+        source: 'portal',
+        type: 'zoom:meeting-created',
+        join_url: 'https://zoom.us/j/987654321',
+      },
+    });
+
+    fireEvent(window, messageEvent);
+
+    // Assert inputs updated
+    await waitFor(() => {
+      const linkInput = screen.getByPlaceholderText('https://meet.example.com/...');
+      expect(linkInput).toHaveValue('https://zoom.us/j/987654321');
+    });
+
+    const locationInput = screen.getByPlaceholderText('Location');
+    expect(locationInput).toHaveValue('https://zoom.us/j/987654321');
+  });
 });

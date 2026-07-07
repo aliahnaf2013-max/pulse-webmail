@@ -259,6 +259,7 @@ export function EventModal({
   );
   const [defaultZoomId, setDefaultZoomId] = useState<string | null>(null);
   const [defaultZoomUrl, setDefaultZoomUrl] = useState<string | null>(null);
+  const [isCreatingZoom, setIsCreatingZoom] = useState(false);
   const [startDate, setStartDate] = useState(formatDateInput(getInitialStart()));
   const [startTime, setStartTime] = useState(formatTimeInput(getInitialStart()));
   const [endDate, setEndDate] = useState(formatDateInput(getInitialEnd()));
@@ -340,10 +341,7 @@ export function EventModal({
     }, 250);
   }, [title, description, startDate, startTime, endDate, endTime, allDay, location, virtualLocation, calendarId]);
 
-  // Zoom Profile Integration: Listen for Zoom details from parent Portal window
-  useEffect(() => {
-    if (isEdit) return;
-
+  const getParentOrigin = (): string => {
     let parentOrigin = "https://app.pulsebusiness.ai";
     if (typeof document !== "undefined") {
       const meta = document.querySelector('meta[name="parent-origin"]');
@@ -358,27 +356,66 @@ export function EventModal({
         }
       }
     }
+    return parentOrigin;
+  };
+
+  const handleCreateZoomMeeting = () => {
+    setIsCreatingZoom(true);
+    const parentOrigin = getParentOrigin();
+    
+    // Calculate start time in ISO format (e.g. "2026-07-10T15:00:00Z")
+    const startStr = `${startDate}T${startTime}:00`;
+    const sDate = new Date(startStr);
+    const isoString = isNaN(sDate.getTime()) ? new Date().toISOString() : sDate.toISOString();
+    
+    window.parent.postMessage(
+      {
+        source: "bulwark",
+        type: "zoom:create-meeting",
+        topic: title || "Scheduled Meeting",
+        startTime: isoString,
+        duration: 60
+      },
+      parentOrigin
+    );
+  };
+
+  // Zoom Profile Integration: Listen for Zoom details from parent Portal window
+  useEffect(() => {
+    const parentOrigin = getParentOrigin();
 
     const handleMessage = (e: MessageEvent) => {
       if (e.origin !== parentOrigin) return;
-      if (e.data?.source === "portal" && e.data?.type === "profile:zoom-info") {
-        const { zoom_meeting_id, zoom_meeting_url } = e.data;
-        if (zoom_meeting_id) {
-          setDefaultZoomId(zoom_meeting_id);
-        }
-        if (zoom_meeting_url) {
-          setDefaultZoomUrl(zoom_meeting_url);
-          setVirtualLocation(zoom_meeting_url);
-          setLocation((prev) => (prev ? prev : zoom_meeting_url));
+      if (e.data?.source === "portal") {
+        if (e.data?.type === "profile:zoom-info" && !isEdit) {
+          const { zoom_meeting_id, zoom_meeting_url } = e.data;
+          if (zoom_meeting_id) {
+            setDefaultZoomId(zoom_meeting_id);
+          }
+          if (zoom_meeting_url) {
+            setDefaultZoomUrl(zoom_meeting_url);
+            setVirtualLocation(zoom_meeting_url);
+            setLocation((prev) => (prev ? prev : zoom_meeting_url));
+          }
+        } else if (e.data?.type === "zoom:meeting-created") {
+          const { join_url } = e.data;
+          if (join_url) {
+            setVirtualLocation(join_url);
+            setLocation((prev) => (prev ? prev : join_url));
+          }
+          setIsCreatingZoom(false);
         }
       }
     };
 
     window.addEventListener("message", handleMessage);
-    window.parent.postMessage(
-      { source: "bulwark", type: "profile:get-zoom-info" },
-      parentOrigin
-    );
+    
+    if (!isEdit) {
+      window.parent.postMessage(
+        { source: "bulwark", type: "profile:get-zoom-info" },
+        parentOrigin
+      );
+    }
 
     return () => {
       window.removeEventListener("message", handleMessage);
@@ -1047,15 +1084,28 @@ export function EventModal({
                   {t("form.meeting_link")}
                 </span>
               </label>
-              {defaultZoomUrl && (
+              <div className="flex gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setVirtualLocation(defaultZoomUrl)}
-                  className="text-xs text-primary hover:underline"
+                  onClick={handleCreateZoomMeeting}
+                  disabled={isCreatingZoom}
+                  className="text-xs text-primary hover:underline font-semibold"
                 >
-                  Use Default Zoom URL
+                  {isCreatingZoom ? "Creating Zoom..." : "Create Zoom Meeting"}
                 </button>
-              )}
+                {defaultZoomUrl && (
+                  <span className="text-xs text-muted-foreground">|</span>
+                )}
+                {defaultZoomUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setVirtualLocation(defaultZoomUrl)}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Use Default Zoom URL
+                  </button>
+                )}
+              </div>
             </div>
             <Input
               type="url"
