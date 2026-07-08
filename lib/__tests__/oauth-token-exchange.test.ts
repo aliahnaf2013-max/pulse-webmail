@@ -83,4 +83,25 @@ describe('oauth/token-exchange getTokenEndpoint', () => {
 
     await expect(getTokenEndpoint()).rejects.toThrow('OAuth token endpoint not found');
   });
+
+  it('adds Supabase apikey headers for Supabase token requests', async () => {
+    process.env.SUPABASE_URL = 'https://supabase.example.com';
+    process.env.SUPABASE_ANON_KEY = 'anon-key-123';
+    const { buildTokenRequestHeaders } = await importModule();
+
+    expect(buildTokenRequestHeaders('https://supabase.example.com/auth/v1/token')).toEqual({
+      'Content-Type': 'application/x-www-form-urlencoded',
+      apikey: 'anon-key-123',
+      Authorization: 'Bearer anon-key-123',
+    });
+  });
+
+  it('does not add Supabase apikey headers for non-Supabase token requests', async () => {
+    process.env.SUPABASE_ANON_KEY = 'anon-key-123';
+    const { buildTokenRequestHeaders } = await importModule();
+
+    expect(buildTokenRequestHeaders('https://idp.example.com/oauth/token')).toEqual({
+      'Content-Type': 'application/x-www-form-urlencoded',
+    });
+  });
 });

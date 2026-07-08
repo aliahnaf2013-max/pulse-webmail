@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { logger } from '@/lib/logger';
 import { refreshTokenCookieName, refreshTokenServerCookieName } from '@/lib/oauth/tokens';
-import { exchangeCodeForTokens, buildOAuthParams, getMetadata, getTokenEndpoint } from '@/lib/oauth/token-exchange';
+import { exchangeCodeForTokens, buildOAuthParams, buildTokenRequestHeaders, getMetadata, getTokenEndpoint } from '@/lib/oauth/token-exchange';
 import { getCookieOptions } from '@/lib/oauth/cookie-config';
 import { MAX_ACCOUNT_SLOTS } from '@/lib/account-utils';
 
@@ -75,7 +75,7 @@ export async function PUT(request: NextRequest) {
 
     const tokenResponse = await fetch(tokenEndpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: buildTokenRequestHeaders(tokenEndpoint),
       body: params.toString(),
     });
 

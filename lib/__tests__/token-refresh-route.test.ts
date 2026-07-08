@@ -37,6 +37,7 @@ const getTokenEndpointMock = vi.fn();
 vi.mock('@/lib/oauth/token-exchange', () => ({
   getTokenEndpoint: (...args: unknown[]) => getTokenEndpointMock(...args),
   buildOAuthParams: (base: Record<string, string>) => new URLSearchParams(base),
+  buildTokenRequestHeaders: () => ({ 'Content-Type': 'application/x-www-form-urlencoded' }),
   exchangeCodeForTokens: vi.fn(),
   getMetadata: vi.fn(),
 }));

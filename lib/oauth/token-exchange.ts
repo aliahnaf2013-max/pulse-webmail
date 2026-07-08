@@ -91,6 +91,28 @@ export function buildOAuthParams(base: Record<string, string>, serverId?: string
   return params;
 }
 
+function getSupabaseAnonKey(): string {
+  return process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+}
+
+function isSupabaseEndpoint(endpoint: string): boolean {
+  const supabaseUrl = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+  if (supabaseUrl && endpoint.startsWith(supabaseUrl.replace(/\/$/, ''))) return true;
+  return endpoint.includes('/auth/v1/token') && endpoint.includes('supabase');
+}
+
+export function buildTokenRequestHeaders(tokenEndpoint: string): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
+  if (isSupabaseEndpoint(tokenEndpoint)) {
+    const anonKey = getSupabaseAnonKey();
+    if (anonKey) {
+      headers.apikey = anonKey;
+      headers.Authorization = `Bearer ${anonKey}`;
+    }
+  }
+  return headers;
+}
+
 export interface TokenResult {
   access_token: string;
   expires_in: number;
@@ -114,7 +136,7 @@ export async function exchangeCodeForTokens(
 
   const tokenResponse = await fetch(tokenEndpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: buildTokenRequestHeaders(tokenEndpoint),
     body: params.toString(),
   });
 
