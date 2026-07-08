@@ -63,7 +63,9 @@ describe('auth-store logout redirects', () => {
       const method = init?.method ?? 'GET';
 
       if (url === '/api/auth/token?slot=0' && method === 'PUT') {
-        return { ok: false, json: async () => ({}) };
+        // Definitive IdP rejection — transient 5xx must NOT trigger this path
+        // (see auth-store-refresh.test.ts).
+        return { ok: false, status: 401, json: async () => ({}) };
       }
 
       if (url === '/api/auth/token?slot=0' && method === 'DELETE') {

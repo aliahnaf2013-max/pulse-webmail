@@ -58,7 +58,11 @@ export async function discoverOAuth(
 ): Promise<OAuthMetadata | null> {
   const cached = metadataCache.get(serverUrl);
   if (cached && cached.expiresAt > Date.now()) return cached.metadata;
-  if (cached) metadataCache.delete(serverUrl);
+  // Expired entries are kept as a stale-on-error fallback: if every
+  // well-known fetch below fails (IdP blip, network partition), serving
+  // stale metadata keeps token refresh alive instead of failing the whole
+  // auth flow. The entry stays expired, so each subsequent call re-attempts
+  // a fresh fetch until one succeeds.
 
   const urls = [
     `${serverUrl}/.well-known/oauth-authorization-server`,
@@ -102,6 +106,11 @@ export async function discoverOAuth(
       errors.push(`${url}: ${err instanceof Error ? err.message : String(err)}`);
       continue;
     }
+  }
+
+  if (cached) {
+    console.warn(`[OAuth] Discovery re-fetch failed for ${serverUrl}, serving stale cached metadata: ${errors.join('; ')}`);
+    return cached.metadata;
   }
 
   console.error(`[OAuth] Discovery failed for ${serverUrl}: ${errors.join('; ')}`);

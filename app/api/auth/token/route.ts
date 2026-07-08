@@ -82,6 +82,13 @@ export async function PUT(request: NextRequest) {
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
       logger.error('Token refresh failed', { status: tokenResponse.status, error: errorText });
+      // Only a definitive IdP rejection (4xx: invalid_grant, revoked token)
+      // may destroy the refresh token. Upstream 5xx / 429 are transient — the
+      // grant is still valid at the IdP, so keep the cookie and let the
+      // client retry.
+      if (tokenResponse.status >= 500 || tokenResponse.status === 429) {
+        return NextResponse.json({ error: 'Token refresh temporarily unavailable' }, { status: 503 });
+      }
       cookieStore.delete(cookieName);
       cookieStore.delete(refreshTokenServerCookieName(slot));
       return NextResponse.json({ error: 'Refresh failed' }, { status: 401 });

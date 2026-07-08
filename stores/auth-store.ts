@@ -260,6 +260,14 @@ function initializeFeatureStores(client: IJMAPClient): void {
   }
 }
 
+// Transient refresh failures (5xx, 429, network errors) are retried with
+// exponential backoff instead of destroying the session; only a definitive
+// 401 from the refresh endpoint logs out. REFRESH_TRANSIENT_RETRY_S feeds
+// scheduleRefresh, which subtracts a 60s buffer — 90 yields a ~30s retry.
+const REFRESH_MAX_ATTEMPTS = 3;
+const REFRESH_RETRY_BASE_MS = 1_000;
+const REFRESH_TRANSIENT_RETRY_S = 90;
+
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 let refreshPromise: Promise<string | null> | null = null;
 
@@ -904,40 +912,63 @@ export const useAuthStore = create<AuthState>()(
 
         const promise = (async () => {
           try {
-            const res = await apiFetch(`/api/auth/token?slot=${slot}`, { method: 'PUT' });
+            for (let attempt = 1; attempt <= REFRESH_MAX_ATTEMPTS; attempt++) {
+              let res: Response | null = null;
+              try {
+                res = await apiFetch(`/api/auth/token?slot=${slot}`, { method: 'PUT' });
+              } catch (error) {
+                debug.error('Token refresh network error:', error);
+              }
 
-            if (!res.ok) {
-              notifyParent('sso:session-expired');
-              markSessionExpired();
-              get().logout();
-              return null;
+              if (res?.ok) {
+                const { access_token, expires_in } = await res.json();
+
+                get().client?.updateAccessToken(access_token);
+
+                if (account) {
+                  await syncStalwartAuthContext(
+                    account.serverUrl,
+                    account.username,
+                    `Bearer ${access_token}`,
+                    slot,
+                  );
+                }
+
+                set({
+                  accessToken: access_token,
+                  tokenExpiresAt: Date.now() + expires_in * 1000,
+                });
+
+                scheduleRefresh(expires_in, get().refreshAccessToken, accountId ?? undefined);
+                return access_token;
+              }
+
+              // Definitive IdP rejection: the refresh grant no longer exists.
+              // This is the ONLY path allowed to destroy the session — a
+              // transient 5xx (e.g. an OAuth discovery blip upstream) must
+              // never log the user out.
+              if (res && res.status === 401) {
+                notifyParent('sso:session-expired');
+                markSessionExpired();
+                get().logout();
+                return null;
+              }
+
+              if (attempt < REFRESH_MAX_ATTEMPTS) {
+                await new Promise((resolve) => setTimeout(resolve, REFRESH_RETRY_BASE_MS * 2 ** (attempt - 1)));
+              }
             }
 
-            const { access_token, expires_in } = await res.json();
-
-            get().client?.updateAccessToken(access_token);
-
-            if (account) {
-              await syncStalwartAuthContext(
-                account.serverUrl,
-                account.username,
-                `Bearer ${access_token}`,
-                slot,
-              );
-            }
-
-            set({
-              accessToken: access_token,
-              tokenExpiresAt: Date.now() + expires_in * 1000,
-            });
-
-            scheduleRefresh(expires_in, get().refreshAccessToken, accountId ?? undefined);
-            return access_token;
+            // Still failing transiently after all backoff attempts: keep the
+            // session (the access token may outlive the outage) and retry later.
+            debug.error('Token refresh failed transiently; keeping session and retrying later');
+            scheduleRefresh(REFRESH_TRANSIENT_RETRY_S, get().refreshAccessToken, accountId ?? undefined);
+            return null;
           } catch (error) {
+            // Unexpected error in the success path (malformed response, auth
+            // context sync failure). Treat as transient — keep the session.
             debug.error('Token refresh failed:', error);
-            notifyParent('sso:session-expired');
-            markSessionExpired();
-            get().logout();
+            scheduleRefresh(REFRESH_TRANSIENT_RETRY_S, get().refreshAccessToken, accountId ?? undefined);
             return null;
           } finally {
             refreshPromise = null;

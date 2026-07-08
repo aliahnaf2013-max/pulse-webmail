@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { OAuthMetadata } from '../oauth/discovery';
 
 const validateEndpoint = async (urlString: string) => {
@@ -175,5 +175,66 @@ describe('oauth/discovery', () => {
     expect(first).toEqual(VALID_METADATA);
     expect(second).toEqual(VALID_METADATA);
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  // Stale-on-error: a transient discovery outage after the 10-minute TTL
+  // expires must not take down token refresh (2026-07-08 incident).
+  describe('stale-on-error', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('serves expired cached metadata when the re-fetch fails', async () => {
+      vi.useFakeTimers();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(VALID_METADATA) })
+        // After TTL expiry, both well-known URLs fail transiently.
+        .mockResolvedValueOnce({ ok: false, status: 401 })
+        .mockRejectedValueOnce(new TypeError('fetch failed'));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const first = await discoverOAuth('https://stale.example.com', { validateEndpoint });
+      expect(first).toEqual(VALID_METADATA);
+
+      vi.advanceTimersByTime(11 * 60 * 1000); // past the 10-minute TTL
+
+      const second = await discoverOAuth('https://stale.example.com', { validateEndpoint });
+      expect(second).toEqual(VALID_METADATA);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(warnSpy).toHaveBeenCalled();
+    });
+
+    it('replaces stale metadata when the re-fetch succeeds', async () => {
+      vi.useFakeTimers();
+      const updated: OAuthMetadata = {
+        ...VALID_METADATA,
+        token_endpoint: 'https://auth.example.com/token-v2',
+      };
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(VALID_METADATA) })
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(updated) });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const first = await discoverOAuth('https://refresh.example.com', { validateEndpoint });
+      expect(first).toEqual(VALID_METADATA);
+
+      vi.advanceTimersByTime(11 * 60 * 1000);
+
+      const second = await discoverOAuth('https://refresh.example.com', { validateEndpoint });
+      expect(second?.token_endpoint).toBe('https://auth.example.com/token-v2');
+    });
+
+    it('still returns null on failure when nothing was ever cached', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.stubGlobal('fetch', vi.fn()
+        .mockResolvedValueOnce({ ok: false, status: 500 })
+        .mockResolvedValueOnce({ ok: false, status: 500 }));
+
+      const result = await discoverOAuth('https://never-cached.example.com', { validateEndpoint });
+
+      expect(result).toBeNull();
+      expect(consoleSpy).toHaveBeenCalled();
+    });
   });
 });

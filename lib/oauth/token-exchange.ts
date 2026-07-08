@@ -56,6 +56,18 @@ function getClientSecret(serverId?: string | null): string {
 }
 
 export async function getTokenEndpoint(serverId?: string | null): Promise<string> {
+  // Static override: pins the token endpoint so refresh does not depend on
+  // runtime discovery at all (e.g. behind Supabase Kong, where the
+  // oauth-authorization-server well-known URL always 401s and the whole flow
+  // otherwise hinges on a single openid-configuration fetch). Per-server
+  // issuer overrides win over the global override so multi-server setups
+  // keep routing refreshes to the right IdP.
+  const entry = getServerEntry(serverId);
+  if (!entry?.oauth?.issuerUrl) {
+    const override = (configManager.get<string>('oauthTokenEndpoint', '') || process.env.OAUTH_TOKEN_ENDPOINT || '').trim();
+    if (override) return override;
+  }
+
   const { discoveryUrl } = getRequiredConfig(serverId);
   const metadata = await discoverOAuth(discoveryUrl, { validateEndpoint: getDiscoveryValidator() });
   if (!metadata?.token_endpoint) {
