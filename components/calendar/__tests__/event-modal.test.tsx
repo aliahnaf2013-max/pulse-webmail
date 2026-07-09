@@ -190,14 +190,17 @@ describe('EventModal Zoom Integration', () => {
     expect(screen.getByPlaceholderText('Location')).toHaveValue('https://zoom.us/j/5114891649');
   });
 
-  it('uses standalone default Zoom settings when Create Zoom Meeting is clicked outside the portal', async () => {
+  it('creates a dynamic Zoom meeting when Create Zoom Meeting is clicked outside the portal', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({ ok: false } as Response);
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        configured: true,
-        zoom_meeting_id: '5114891649',
-        zoom_meeting_url: 'https://zoom.us/j/5114891649',
+        success: true,
+        fallback: false,
+        meeting: {
+          id: 987654321,
+          join_url: 'https://zoom.us/j/987654321',
+        },
       }),
     } as Response);
 
@@ -207,7 +210,11 @@ describe('EventModal Zoom Integration', () => {
     fireEvent.click(createBtn);
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText('https://meet.example.com/...')).toHaveValue('https://zoom.us/j/5114891649');
+      expect(fetch).toHaveBeenLastCalledWith('/api/zoom/create', expect.objectContaining({
+        method: 'POST',
+        credentials: 'same-origin',
+      }));
+      expect(screen.getByPlaceholderText('https://meet.example.com/...')).toHaveValue('https://zoom.us/j/987654321');
     });
     expect(createBtn).toHaveTextContent('Create Zoom Meeting');
   });

@@ -392,6 +392,26 @@ export function EventModal({
     }
   }, [applyZoomDefaults]);
 
+  const createStandaloneZoomMeeting = useCallback(async (topic: string, startTime: string, duration: number) => {
+    const response = await fetch("/api/zoom/create", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ topic, startTime, duration }),
+    });
+    if (!response.ok) throw new Error("Failed to create Zoom meeting");
+    const data = await response.json() as {
+      meeting?: { id?: number | string | null; join_url?: string | null };
+    };
+    const joinUrl = data.meeting?.join_url;
+    if (!joinUrl) throw new Error("Zoom meeting response missing join URL");
+    const meetingId = data.meeting?.id != null ? String(data.meeting.id) : null;
+    applyZoomDefaults(meetingId, joinUrl);
+  }, [applyZoomDefaults]);
+
   const handleCreateZoomMeeting = async () => {
     setIsCreatingZoom(true);
     const parentOrigin = getParentOrigin();
@@ -402,8 +422,13 @@ export function EventModal({
     const isoString = isNaN(sDate.getTime()) ? new Date().toISOString() : sDate.toISOString();
 
     if (!isPortalHosted()) {
-      await fetchStandaloneZoomDefaults();
-      setIsCreatingZoom(false);
+      try {
+        await createStandaloneZoomMeeting(title || "Scheduled Meeting", isoString, 60);
+      } catch {
+        await fetchStandaloneZoomDefaults();
+      } finally {
+        setIsCreatingZoom(false);
+      }
       return;
     }
     
