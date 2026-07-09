@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  htmlDocumentToComposerQuoteFragment,
   plainTextToComposerBody,
   rewriteCidImagesForEditor,
   replaceInlineImagePlaceholders,
@@ -64,6 +65,26 @@ describe("rewriteCidImagesForEditor", () => {
     );
     expect(out).toContain('src="https://example.com/x.png"');
     expect(out).toContain('data-cid="y"');
+  });
+});
+
+describe("htmlDocumentToComposerQuoteFragment", () => {
+  it("returns fragments unchanged", () => {
+    const html = '<table><tr><td>Already a fragment</td></tr></table>';
+    expect(htmlDocumentToComposerQuoteFragment(html)).toBe(html);
+  });
+
+  it("extracts only the body from a complete HTML document", () => {
+    const out = htmlDocumentToComposerQuoteFragment(
+      '<!doctype html><html><head><style>.x{color:red}</style></head><body><table data-pulse-email-shell="true"><tr><td>PULSE</td></tr></table></body></html>'
+    );
+
+    expect(out).toContain('data-pulse-email-shell="true"');
+    expect(out).toContain("PULSE");
+    expect(out).not.toContain("<!doctype");
+    expect(out).not.toContain("<html");
+    expect(out).not.toContain("<head");
+    expect(out).not.toContain("<style");
   });
 });
 

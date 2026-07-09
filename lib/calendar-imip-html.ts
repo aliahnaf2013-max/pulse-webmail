@@ -140,15 +140,14 @@ function calloutRow(label: string, value: string, htmlValue?: string): string {
 }
 
 /**
- * Brand lockup mirroring the compose signature: PNG logo + "Pulse" wordmark with
- * a small amber "Business AI" sub-label. Wordmark text is the fallback when the
- * image is blocked/undownloaded.
+ * Approved Pulse email lockup. Keep both lines the same visual width and keep
+ * "AI" grouped; see ops/mail-templates/PULSE_LOGO_RULES.md.
  */
 function logoBlock(): string {
-  return `<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
-                <td valign="middle">
-                  <span style="display:block;font-size:30px;font-weight:800;color:#ffffff;letter-spacing:0.18em;line-height:1.0;text-transform:uppercase;">Pulse</span>
-                  <span style="display:block;margin-top:4px;font-size:11px;font-weight:800;letter-spacing:0.36em;text-transform:uppercase;color:${BRAND.colors.amber};line-height:1.0;">Business AI</span>
+  return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" data-pulse-logo-rule="equal-width-lockup"><tr>
+                <td valign="middle" style="font-family:${BRAND.fonts.body};padding:0;">
+                  <div style="font-size:38px;line-height:0.95;font-weight:800;letter-spacing:3.5px;color:#ffffff;text-transform:uppercase;">PULSE</div>
+                  <div style="margin-top:9px;font-size:16px;line-height:1;font-weight:800;letter-spacing:3.5px;word-spacing:4px;color:${BRAND.colors.amber};text-transform:uppercase;">BUSINESS AI</div>
                 </td>
               </tr></table>`;
 }

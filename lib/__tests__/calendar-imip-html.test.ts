@@ -41,27 +41,29 @@ describe("buildImipInvitationHtml", () => {
     expect(html).toContain("Agenda items");
   });
 
-  it("header has the signature gradient + PNG logo with wordmark fallback", () => {
+  it("header has the signature gradient + approved equal-width text lockup", () => {
     const html = buildImipInvitationHtml(makeEvent());
     // Amber + blue two-layer gradient (degrades to navy in Outlook).
     expect(html).toContain("radial-gradient");
     expect(html).toContain("background-color:#0B1426");
     expect(html).toContain("#f59e0b");
-    // PNG logo (NOT SVG — Outlook can render PNG once images download).
-    expect(html).toContain("Pulse_Favicon.png");
+    expect(html).toContain('data-pulse-logo-rule="equal-width-lockup"');
+    expect(html).toContain("font-size:38px");
+    expect(html).toContain("letter-spacing:3.5px");
+    expect(html).toContain("font-size:16px");
+    expect(html).toContain("word-spacing:4px");
     expect(html).not.toContain("Pulse_Favicon.svg");
-    // Wordmark stays as the image-blocked fallback.
-    expect(html).toContain(">Pulse<");
-    expect(html).toContain(">Business AI<");
+    expect(html).toContain(">PULSE<");
+    expect(html).toContain(">BUSINESS AI<");
   });
 
-  it("matches the transactional shell chrome (force-light, wordmark, callout, 4-link footer)", () => {
+  it("matches the transactional shell chrome (force-light, wordmark, callout, footer)", () => {
     const html = buildImipInvitationHtml(makeEvent());
     // Bulwark iframe invert survival + Apple Mail dark mode.
     expect(html).toContain("pulse-force-light");
     expect(html).toContain("prefers-color-scheme: dark");
     // Navy header carries the wordmark, not just the logo.
-    expect(html).toContain("Pulse Business AI");
+    expect(html).toContain("BUSINESS AI");
     // Single bordered card + detail callout, matching shell.html.j2.
     expect(html).toContain("pulse-email-card");
     expect(html).toContain("pulse-callout-cell");

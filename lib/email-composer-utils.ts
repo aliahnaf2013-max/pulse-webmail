@@ -53,6 +53,25 @@ export function rewriteCidImagesForEditor(html: string): string {
 }
 
 /**
+ * Reply/forward editors must quote an HTML fragment, not a complete email
+ * document. Quoting `<html><head>...` inside a blockquote produces invalid
+ * nested documents and makes branded email shells collapse in replies.
+ */
+export function htmlDocumentToComposerQuoteFragment(html: string): string {
+  if (!html) return "";
+  const looksLikeDocument = /<!doctype|<html[\s>]|<head[\s>]|<body[\s>]/i.test(html);
+  if (!looksLikeDocument) return html;
+
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  return doc.body.innerHTML || html
+    .replace(/<!doctype[^>]*>/gi, "")
+    .replace(/<head[\s\S]*?<\/head>/gi, "")
+    .replace(/<\/?html[^>]*>/gi, "")
+    .replace(/<\/?body[^>]*>/gi, "")
+    .trim();
+}
+
+/**
  * Replaces the placeholder src on `<img data-cid="...">` elements with the
  * resolved data URL once the inline blob has been fetched. Leaves images
  * whose src has been edited away from the placeholder/cid alone.

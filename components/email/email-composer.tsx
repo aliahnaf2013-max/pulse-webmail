@@ -36,6 +36,7 @@ import { appendPlainTextSignature, getPlainTextSignature } from "@/lib/signature
 import { resolveReplyFrom } from "@/lib/reply-identity";
 import { computeReplyThreadingHeaders } from "@/lib/email-threading";
 import {
+  htmlDocumentToComposerQuoteFragment,
   rewriteCidImagesForEditor,
   replaceInlineImagePlaceholders,
 } from "@/lib/email-composer-utils";
@@ -346,7 +347,7 @@ export function EmailComposer({
     if (replyTo.quoteHeaderHtml !== undefined && (mode === 'reply' || mode === 'replyAll' || mode === 'forward')) {
       const wrap = replyTo.quoteWrapInBlockquote !== false;
       const originalHtml = replyTo.htmlBody
-        ? rewriteCidImagesForEditor(replyTo.htmlBody)
+        ? rewriteCidImagesForEditor(htmlDocumentToComposerQuoteFragment(replyTo.htmlBody))
         : (replyTo.body
           ? replyTo.body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
           : '');
@@ -363,7 +364,7 @@ export function EmailComposer({
         : `On ${date}, ${fromStr} wrote:<br>`;
       // cid: image refs are rewritten so they render in the editor (browsers
       // can't fetch cid: URLs); see useEffect below for the data-URL backfill.
-      const quotedHtml = rewriteCidImagesForEditor(replyTo.htmlBody);
+      const quotedHtml = rewriteCidImagesForEditor(htmlDocumentToComposerQuoteFragment(replyTo.htmlBody));
       return `${prefix}${signatureBlock}<br><div>${quoteHeader}</div><blockquote style="margin:0 0 0 0.8ex;border-left:2px solid #ccc;padding-left:1ex">${quotedHtml}</blockquote>`;
     }
 
