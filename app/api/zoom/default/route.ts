@@ -1,17 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { decryptSession } from '@/lib/auth/crypto';
-import { sessionCookieName } from '@/lib/auth/session-cookie';
-import { MAX_ACCOUNT_SLOTS } from '@/lib/account-utils';
+import { getStalwartCredentials } from '@/lib/stalwart/credentials';
 import { logger } from '@/lib/logger';
-
-function getSlot(request: NextRequest): number {
-  const raw = request.nextUrl.searchParams.get('slot');
-  if (raw === null) return 0;
-  const slot = parseInt(raw, 10);
-  if (Number.isNaN(slot) || slot < 0 || slot >= MAX_ACCOUNT_SLOTS) return 0;
-  return slot;
-}
 
 function normalizeZoomUrl(value: string): string | null {
   const trimmed = value.trim();
@@ -48,11 +37,8 @@ function resolveDefaultZoom() {
 
 export async function GET(request: NextRequest) {
   try {
-    const slot = getSlot(request);
-    const cookieStore = await cookies();
-    const token = cookieStore.get(sessionCookieName(slot))?.value;
-
-    if (!token || !decryptSession(token)) {
+    const credentials = await getStalwartCredentials(request);
+    if (!credentials) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
