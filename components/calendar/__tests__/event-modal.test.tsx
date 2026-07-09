@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventModal } from '../event-modal';
 
 // Mock next-intl
@@ -41,9 +41,23 @@ describe('EventModal Zoom Integration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal('fetch', vi.fn());
   });
 
+  afterEach(() => {
+    document.head.innerHTML = '';
+    vi.unstubAllGlobals();
+  });
+
+  function enablePortalMode() {
+    const meta = document.createElement('meta');
+    meta.setAttribute('name', 'parent-origin');
+    meta.setAttribute('content', 'https://app.pulsebusiness.ai');
+    document.head.appendChild(meta);
+  }
+
   it('requests default Zoom settings from parent on mount and pre-fills fields upon receiving them', async () => {
+    enablePortalMode();
     const postMessageSpy = vi.spyOn(window.parent, 'postMessage');
 
     render(<EventModal {...defaultProps} />);
@@ -83,6 +97,7 @@ describe('EventModal Zoom Integration', () => {
   });
 
   it('rejects postMessage responses from unauthorized origins', async () => {
+    enablePortalMode();
     render(<EventModal {...defaultProps} />);
 
     const messageEvent = new MessageEvent('message', {
@@ -105,6 +120,7 @@ describe('EventModal Zoom Integration', () => {
   });
 
   it('sends zoom:create-meeting request to parent when Create Zoom Meeting is clicked and sets inputs on success', async () => {
+    enablePortalMode();
     const postMessageSpy = vi.spyOn(window, 'postMessage');
     const parentPostMessageSpy = vi.spyOn(window.parent, 'postMessage');
 
@@ -147,5 +163,52 @@ describe('EventModal Zoom Integration', () => {
 
     const locationInput = screen.getByPlaceholderText('Location');
     expect(locationInput).toHaveValue('https://zoom.us/j/987654321');
+  });
+
+  it('loads default Zoom settings from same-origin API when standalone webmail is not embedded', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        configured: true,
+        zoom_meeting_id: '5114891649',
+        zoom_meeting_url: 'https://zoom.us/j/5114891649',
+      }),
+    } as Response);
+
+    render(<EventModal {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith('/api/zoom/default', {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('https://meet.example.com/...')).toHaveValue('https://zoom.us/j/5114891649');
+    });
+    expect(screen.getByPlaceholderText('Location')).toHaveValue('https://zoom.us/j/5114891649');
+  });
+
+  it('uses standalone default Zoom settings when Create Zoom Meeting is clicked outside the portal', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({ ok: false } as Response);
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        configured: true,
+        zoom_meeting_id: '5114891649',
+        zoom_meeting_url: 'https://zoom.us/j/5114891649',
+      }),
+    } as Response);
+
+    render(<EventModal {...defaultProps} />);
+
+    const createBtn = screen.getByText('Create Zoom Meeting');
+    fireEvent.click(createBtn);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('https://meet.example.com/...')).toHaveValue('https://zoom.us/j/5114891649');
+    });
+    expect(createBtn).toHaveTextContent('Create Zoom Meeting');
   });
 });

@@ -359,7 +359,40 @@ export function EventModal({
     return parentOrigin;
   };
 
-  const handleCreateZoomMeeting = () => {
+  const isPortalHosted = (): boolean => {
+    if (typeof window === "undefined" || typeof document === "undefined") return false;
+    return window.parent !== window || !!document.querySelector('meta[name="parent-origin"]');
+  };
+
+  const applyZoomDefaults = useCallback((zoomId?: string | null, zoomUrl?: string | null) => {
+    if (zoomId) {
+      setDefaultZoomId(zoomId);
+    }
+    if (zoomUrl) {
+      setDefaultZoomUrl(zoomUrl);
+      setVirtualLocation((prev) => (prev ? prev : zoomUrl));
+      setLocation((prev) => (prev ? prev : zoomUrl));
+    }
+  }, []);
+
+  const fetchStandaloneZoomDefaults = useCallback(async () => {
+    try {
+      const response = await fetch("/api/zoom/default", {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) return;
+      const data = await response.json() as {
+        zoom_meeting_id?: string | null;
+        zoom_meeting_url?: string | null;
+      };
+      applyZoomDefaults(data.zoom_meeting_id, data.zoom_meeting_url);
+    } catch {
+      // Standalone Zoom defaults are optional; keep manual entry available.
+    }
+  }, [applyZoomDefaults]);
+
+  const handleCreateZoomMeeting = async () => {
     setIsCreatingZoom(true);
     const parentOrigin = getParentOrigin();
     
@@ -367,6 +400,12 @@ export function EventModal({
     const startStr = `${startDate}T${startTime}:00`;
     const sDate = new Date(startStr);
     const isoString = isNaN(sDate.getTime()) ? new Date().toISOString() : sDate.toISOString();
+
+    if (!isPortalHosted()) {
+      await fetchStandaloneZoomDefaults();
+      setIsCreatingZoom(false);
+      return;
+    }
     
     window.parent.postMessage(
       {
@@ -389,14 +428,7 @@ export function EventModal({
       if (e.data?.source === "portal") {
         if (e.data?.type === "profile:zoom-info" && !isEdit) {
           const { zoom_meeting_id, zoom_meeting_url } = e.data;
-          if (zoom_meeting_id) {
-            setDefaultZoomId(zoom_meeting_id);
-          }
-          if (zoom_meeting_url) {
-            setDefaultZoomUrl(zoom_meeting_url);
-            setVirtualLocation(zoom_meeting_url);
-            setLocation((prev) => (prev ? prev : zoom_meeting_url));
-          }
+          applyZoomDefaults(zoom_meeting_id, zoom_meeting_url);
         } else if (e.data?.type === "zoom:meeting-created") {
           const { join_url } = e.data;
           if (join_url) {
@@ -411,16 +443,20 @@ export function EventModal({
     window.addEventListener("message", handleMessage);
     
     if (!isEdit) {
-      window.parent.postMessage(
-        { source: "bulwark", type: "profile:get-zoom-info" },
-        parentOrigin
-      );
+      if (isPortalHosted()) {
+        window.parent.postMessage(
+          { source: "bulwark", type: "profile:get-zoom-info" },
+          parentOrigin
+        );
+      } else {
+        void fetchStandaloneZoomDefaults();
+      }
     }
 
     return () => {
       window.removeEventListener("message", handleMessage);
     };
-  }, [isEdit]);
+  }, [applyZoomDefaults, fetchStandaloneZoomDefaults, isEdit]);
 
   // Report live preview to parent for grid outline
   useEffect(() => {
