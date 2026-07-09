@@ -36,6 +36,19 @@ function fallbackResponse(reason: string, status = 200) {
 
 type ZoomMeeting = { id?: number; join_url?: string; topic?: string };
 
+function readZoomMeeting(value: unknown): ZoomMeeting | null {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.join_url === 'string') {
+    return {
+      id: typeof record.id === 'number' ? record.id : undefined,
+      join_url: record.join_url,
+      topic: typeof record.topic === 'string' ? record.topic : undefined,
+    };
+  }
+  return readZoomMeeting(record.data);
+}
+
 async function createViaAgentHub(topic: string, startTime: string, duration: number): Promise<ZoomMeeting | null> {
   const secret = process.env.AGENT_HUB_SIGNING_SECRET?.trim();
   if (!secret) return null;
@@ -58,9 +71,9 @@ async function createViaAgentHub(topic: string, startTime: string, duration: num
 
   const responseBody = await response.json().catch(() => null) as {
     ok?: boolean;
-    data?: { ok?: boolean; data?: ZoomMeeting };
+    data?: unknown;
   } | null;
-  const meeting = responseBody?.data?.data;
+  const meeting = readZoomMeeting(responseBody?.data);
   if (!response.ok || !responseBody?.ok || !meeting?.join_url) return null;
   return meeting;
 }
