@@ -34,6 +34,37 @@ function fallbackResponse(reason: string, status = 200) {
   );
 }
 
+type ZoomMeeting = { id?: number; join_url?: string; topic?: string };
+
+async function createViaAgentHub(topic: string, startTime: string, duration: number): Promise<ZoomMeeting | null> {
+  const secret = process.env.AGENT_HUB_SIGNING_SECRET?.trim();
+  if (!secret) return null;
+
+  const hubBase = (process.env.AGENT_HUB_URL || 'https://agent-hub.pulsebusiness.ai').replace(/\/$/, '');
+  const response = await fetch(`${hubBase}/tools/zoom_meeting_create`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${secret}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      topic,
+      start_time: startTime,
+      duration,
+      timezone: 'UTC',
+    }),
+  });
+
+  const responseBody = await response.json().catch(() => null) as {
+    ok?: boolean;
+    data?: { ok?: boolean; data?: ZoomMeeting };
+  } | null;
+  const meeting = responseBody?.data?.data;
+  if (!response.ok || !responseBody?.ok || !meeting?.join_url) return null;
+  return meeting;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const credentials = await getStalwartCredentials(request);
@@ -53,6 +84,19 @@ export async function POST(request: NextRequest) {
 
     if (!startTime || Number.isNaN(new Date(startTime).getTime())) {
       return NextResponse.json({ error: 'startTime must be a valid ISO date' }, { status: 400 });
+    }
+
+    const agentHubMeeting = await createViaAgentHub(topic, startTime, duration).catch((error) => {
+      logger.warn('Agent Hub Zoom creation failed; trying Pulse API', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      return null;
+    });
+    if (agentHubMeeting?.join_url) {
+      return NextResponse.json(
+        { success: true, fallback: false, meeting: agentHubMeeting },
+        { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } },
+      );
     }
 
     const apiBase = (process.env.PULSE_API_URL || process.env.PULSE_APP_API_URL || 'https://api.pulsebusiness.ai').replace(/\/$/, '');
