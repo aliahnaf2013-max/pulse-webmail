@@ -31,6 +31,7 @@ vi.mock('@/hooks/use-format-event-date', () => ({
 }));
 
 describe('EventModal Zoom Integration', () => {
+  const originalParent = Object.getOwnPropertyDescriptor(window, 'parent');
   const defaultProps = {
     calendars: [
       { id: 'cal-1', name: 'Primary', color: '#2563eb', isDefault: true } as any,
@@ -45,11 +46,16 @@ describe('EventModal Zoom Integration', () => {
   });
 
   afterEach(() => {
+    if (originalParent) Object.defineProperty(window, 'parent', originalParent);
     document.head.innerHTML = '';
     vi.unstubAllGlobals();
   });
 
   function enablePortalMode() {
+    Object.defineProperty(window, 'parent', {
+      configurable: true,
+      value: { postMessage: vi.fn() },
+    });
     const meta = document.createElement('meta');
     meta.setAttribute('name', 'parent-origin');
     meta.setAttribute('content', 'https://app.pulsebusiness.ai');

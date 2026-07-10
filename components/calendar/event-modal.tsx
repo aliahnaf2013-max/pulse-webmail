@@ -360,8 +360,8 @@ export function EventModal({
   };
 
   const isPortalHosted = (): boolean => {
-    if (typeof window === "undefined" || typeof document === "undefined") return false;
-    return window.parent !== window || !!document.querySelector('meta[name="parent-origin"]');
+    if (typeof window === "undefined") return false;
+    return window.parent !== window;
   };
 
   const applyZoomDefaults = useCallback((zoomId?: string | null, zoomUrl?: string | null) => {
