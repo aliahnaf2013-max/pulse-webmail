@@ -85,11 +85,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const authHeader = credentials.authHeader || '';
-    if (!authHeader.startsWith('Bearer ')) {
-      return fallbackResponse('No SSO bearer context available for dynamic Zoom creation');
-    }
-
     const body = await request.json().catch(() => ({}));
     const topic = readString(body.topic) || 'Scheduled Meeting';
     const startTime = readString(body.startTime);
@@ -110,6 +105,11 @@ export async function POST(request: NextRequest) {
         { success: true, fallback: false, meeting: agentHubMeeting },
         { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } },
       );
+    }
+
+    const authHeader = credentials.authHeader || '';
+    if (!authHeader.startsWith('Bearer ')) {
+      return fallbackResponse('No SSO bearer context available for Pulse API Zoom fallback');
     }
 
     const apiBase = (process.env.PULSE_API_URL || process.env.PULSE_APP_API_URL || 'https://api.pulsebusiness.ai').replace(/\/$/, '');
