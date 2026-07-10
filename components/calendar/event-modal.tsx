@@ -409,8 +409,11 @@ export function EventModal({
     const joinUrl = data.meeting?.join_url;
     if (!joinUrl) throw new Error("Zoom meeting response missing join URL");
     const meetingId = data.meeting?.id != null ? String(data.meeting.id) : null;
-    applyZoomDefaults(meetingId, joinUrl);
-  }, [applyZoomDefaults]);
+    if (meetingId) setDefaultZoomId(meetingId);
+    setDefaultZoomUrl(joinUrl);
+    setVirtualLocation(joinUrl);
+    setLocation(joinUrl);
+  }, []);
 
   const handleCreateZoomMeeting = async () => {
     setIsCreatingZoom(true);

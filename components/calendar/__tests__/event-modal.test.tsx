@@ -197,7 +197,14 @@ describe('EventModal Zoom Integration', () => {
   });
 
   it('creates a dynamic Zoom meeting when Create Zoom Meeting is clicked outside the portal', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce({ ok: false } as Response);
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        configured: true,
+        zoom_meeting_id: '5114891649',
+        zoom_meeting_url: 'https://zoom.us/j/5114891649',
+      }),
+    } as Response);
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -211,6 +218,10 @@ describe('EventModal Zoom Integration', () => {
     } as Response);
 
     render(<EventModal {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('https://meet.example.com/...')).toHaveValue('https://zoom.us/j/5114891649');
+    });
 
     const createBtn = screen.getByText('Create Zoom Meeting');
     fireEvent.click(createBtn);
