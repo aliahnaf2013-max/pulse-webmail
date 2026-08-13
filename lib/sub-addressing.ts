@@ -145,7 +145,6 @@ export function suggestTagsForDomain(domain: string): string[] {
     'x.com': ['twitter', 'social'],
     'linkedin.com': ['linkedin', 'professional'],
     'github.com': ['github', 'dev', 'notifications'],
-    'gitlab.com': ['gitlab', 'dev', 'notifications'],
     'stackoverflow.com': ['stackoverflow', 'dev'],
     'reddit.com': ['reddit', 'social'],
     'netflix.com': ['netflix', 'entertainment'],

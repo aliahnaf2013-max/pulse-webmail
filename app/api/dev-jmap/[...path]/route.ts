@@ -662,7 +662,7 @@ const emails: MockEmail[] = [
     textBody: [{ partId: 'p1', blobId: 'blob-056', size: 800, type: 'text/plain' }],
     htmlBody: [],
     bodyValues: {
-      p1: { value: 'Välkommen till laget!\n\nHere\'s your development environment setup guide:\n\n1. Clone the monorepo: git clone git@gitlab.example:fjord/monorepo.git\n2. Install dependencies: npm install\n3. Set up local database: docker-compose up -d\n4. Configure environment variables (see .env.example)\n5. Run the test suite: npm test\n\nAccess credentials:\n- Jira: your-email (SSO)\n- GitLab: your-email (SSO)\n- Hetzner Console: IAM user created, check Bitwarden\n\nQuestions? Reach out on #dev-onboarding in Mattermost.\n\nBästa hälsningar,\nIT Abteilung' },
+      p1: { value: 'Välkommen till laget!\n\nHere\'s your development environment setup guide:\n\n1. Clone the monorepo: git clone git@github.com:fjord/monorepo.git\n2. Install dependencies: npm install\n3. Set up local database: docker-compose up -d\n4. Configure environment variables (see .env.example)\n5. Run the test suite: npm test\n\nAccess credentials:\n- Jira: your-email (SSO)\n- GitHub: your-email (SSO)\n- Hetzner Console: IAM user created, check Bitwarden\n\nQuestions? Reach out on #dev-onboarding in Mattermost.\n\nBästa hälsningar,\nIT Abteilung' },
     },
     attachments: [
       { partId: 'att6', blobId: 'blob-att-006', size: 125000, name: 'Entwicklung-Setup-Guide.pdf', type: 'application/pdf' },
